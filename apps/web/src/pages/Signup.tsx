@@ -15,11 +15,12 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
+import { trpc } from '@/lib/trpc'
 
 const signupSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters').max(50),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -29,9 +30,10 @@ const signupSchema = z.object({
 type SignupFormValues = z.infer<typeof signupSchema>
 
 export const Signup = () => {
-  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const signupMutation = trpc.auth.signup.useMutation()
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -44,21 +46,22 @@ export const Signup = () => {
   })
 
   const onSubmit = async (values: SignupFormValues) => {
-    setIsLoading(true)
+    setError(null)
     try {
-      // TODO: Implement actual signup with tRPC
-      console.log('Signup attempt:', values)
+      const result = await signupMutation.mutateAsync({
+        email: values.email,
+        username: values.username,
+        password: values.password,
+      })
 
-      // Placeholder - replace with actual API call
-      // const result = await trpc.auth.signup.mutate(values)
-      // login(result.token, result.user)
+      // Store auth token and user data
+      login(result.token, result.user)
 
-      // For now, just navigate
-      // navigate('/collections')
-    } catch (error) {
-      console.error('Signup failed:', error)
-    } finally {
-      setIsLoading(false)
+      // Navigate to collections dashboard
+      navigate('/collections')
+    } catch (err: any) {
+      console.error('Signup failed:', err)
+      setError(err.message || 'Failed to create account. Please try again.')
     }
   }
 
@@ -140,8 +143,14 @@ export const Signup = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Creating account...' : 'Create Account'}
+              {error && (
+                <div className="rounded-md bg-red-950/50 border border-red-500/50 p-3">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={signupMutation.isPending}>
+                {signupMutation.isPending ? 'Creating account...' : 'Create Account'}
               </Button>
             </form>
           </Form>

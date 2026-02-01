@@ -15,43 +15,42 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
+import { trpc } from '@/lib/trpc'
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  emailOrUsername: z.string().min(1, 'Email or username is required'),
+  password: z.string().min(1, 'Password is required'),
 })
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
 export const Login = () => {
-  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const loginMutation = trpc.auth.login.useMutation()
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      emailOrUsername: '',
       password: '',
     },
   })
 
   const onSubmit = async (values: LoginFormValues) => {
-    setIsLoading(true)
+    setError(null)
     try {
-      // TODO: Implement actual login with tRPC
-      console.log('Login attempt:', values)
+      const result = await loginMutation.mutateAsync(values)
 
-      // Placeholder - replace with actual API call
-      // const result = await trpc.auth.login.mutate(values)
-      // login(result.token, result.user)
+      // Store auth token and user data
+      login(result.token, result.user)
 
-      // For now, just navigate
-      // navigate('/collections')
-    } catch (error) {
-      console.error('Login failed:', error)
-    } finally {
-      setIsLoading(false)
+      // Navigate to collections dashboard
+      navigate('/collections')
+    } catch (err: any) {
+      console.error('Login failed:', err)
+      setError(err.message || 'Invalid credentials. Please try again.')
     }
   }
 
@@ -71,14 +70,13 @@ export const Login = () => {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
+                name="emailOrUsername"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email or Username</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
-                        placeholder="you@example.com"
+                        placeholder="you@example.com or username"
                         {...field}
                       />
                     </FormControl>
@@ -103,8 +101,14 @@ export const Login = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
+              {error && (
+                <div className="rounded-md bg-red-950/50 border border-red-500/50 p-3">
+                  <p className="text-sm text-red-400">{error}</p>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
+                {loginMutation.isPending ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
           </Form>

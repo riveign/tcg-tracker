@@ -1,19 +1,24 @@
 # TCG Collection Tracker
 
-A mobile-first single-page application for tracking Magic: The Gathering card collections with OCR scanning, deck building, and multi-user collaboration.
+A mobile-first single-page application for tracking Magic: The Gathering card collections with advanced search, filtering, and deck building capabilities.
 
 ## 🎯 Project Vision
 
 Create a "snappy, techy, pristine collection" tracker that:
-- Scans cards using phone camera + OCR
 - Organizes multiple collections with aggregated views
-- Enables collaborative collection management
-- Provides powerful deck-building tools with MTG Arena-style filtering
+- Provides powerful card search with advanced filtering
+- Enables deck-building tools with MTG Arena-style filtering
+- Supports collaborative collection management
 - Extends to support other TCGs in the future
 
 ## 📚 Documentation
 
-- **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Complete implementation plan, tech stack, and roadmap
+**Start Here:**
+- **[QUICK_START.md](./QUICK_START.md)** - Get started in 5 seconds
+- **[HANDOVER.md](./HANDOVER.md)** - Complete project documentation and next steps
+
+**Planning & Research:**
+- **[PROJECT_PLAN.md](./PROJECT_PLAN.md)** - Original implementation plan and tech stack
 - **[schema.sql](./schema.sql)** - PostgreSQL database schema
 - **[docs/MTG_DATA_MODEL.md](./docs/MTG_DATA_MODEL.md)** - Card modeling and keyword extraction research
 - **[docs/OCR_RESEARCH.md](./docs/OCR_RESEARCH.md)** - OCR technology evaluation and recommendations
@@ -47,42 +52,51 @@ Create a "snappy, techy, pristine collection" tracker that:
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+ or Bun
-- PostgreSQL 16+ (or Neon account)
+- Bun (package manager)
+- PostgreSQL 16+
 - Git
 
-### Setup (Coming Soon)
+### Development
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd tcg-tracker
+cd /home/mantis/Development/tcg-tracker
 
-# Install dependencies
-npm install
+# Terminal 1 - Backend
+bun run dev:api
 
-# Set up environment variables
-cp .env.example .env.local
-
-# Run database migrations
-npm run db:push
-
-# Start development server
-npm run dev
+# Terminal 2 - Frontend
+bun run dev:web
 ```
+
+**URLs:**
+- Frontend: http://localhost:5174
+- Backend: http://localhost:3001
+
+See [QUICK_START.md](./QUICK_START.md) for full setup and testing instructions.
 
 ## 📋 Project Status
 
-**Current Phase**: Planning Complete ✅
+**Current Phase**: Core Features Complete ✅
 
-**Next Steps**:
-1. Set up monorepo structure (frontend + backend)
-2. Initialize frontend with Vite + React + TypeScript
-3. Initialize backend with Hono + Drizzle + tRPC
-4. Set up PostgreSQL database and run schema
-5. Configure Tailwind CSS + shadcn/ui
-6. Implement authentication with Clerk
+**Completed:**
+- ✅ Monorepo structure with Turborepo
+- ✅ Frontend (React + Vite + TypeScript + Tailwind + shadcn/ui)
+- ✅ Backend (Hono + tRPC + Drizzle ORM)
+- ✅ PostgreSQL database with soft deletes
+- ✅ User authentication with Clerk
+- ✅ Collection management (create, update, delete)
+- ✅ Card search integration with Scryfall API
+- ✅ Add/remove cards from collections
+- ✅ Card quantity management with optimistic updates
+- ✅ Complete collection view (aggregated across all collections)
+- ✅ Advanced filtering (colors, types, keywords, rarity, CMC)
+- ✅ Collection search (within individual or complete collections)
 
-See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for the full 8-week implementation roadmap.
+**Next Steps:**
+1. Implement Deck Builder (full plan in HANDOVER.md)
+2. Add mana curve visualization
+3. Deck statistics and validation
+
+See [HANDOVER.md](./HANDOVER.md) for complete implementation details and next steps.
 
 ## 🎨 Design Aesthetic
 
@@ -93,42 +107,87 @@ See [PROJECT_PLAN.md](./PROJECT_PLAN.md) for the full 8-week implementation road
 - Clean, modern typography (Inter + Space Grotesk)
 - Smooth animations and transitions
 
-## 🗂️ Project Structure (Planned)
+## 🗂️ Project Structure
 
 ```
 tcg-tracker/
 ├── apps/
-│   ├── web/          # Frontend (React + Vite)
-│   └── api/          # Backend (Hono + tRPC)
+│   ├── web/                      # Frontend (React + Vite)
+│   │   ├── src/
+│   │   │   ├── components/       # UI components
+│   │   │   │   ├── cards/        # Card-related components
+│   │   │   │   ├── layout/       # Layout components
+│   │   │   │   └── ui/           # shadcn/ui components
+│   │   │   ├── pages/            # Route pages
+│   │   │   ├── hooks/            # Custom React hooks
+│   │   │   └── lib/              # Utilities (tRPC client)
+│   │   └── package.json
+│   └── api/                      # Backend (Hono + tRPC)
+│       ├── src/
+│       │   ├── router/           # tRPC routers
+│       │   │   ├── auth.ts       # Authentication
+│       │   │   ├── cards.ts      # Card search
+│       │   │   ├── collections.ts # Collection management
+│       │   │   └── complete.ts   # Aggregated view
+│       │   └── lib/              # Scryfall API integration
+│       └── package.json
 ├── packages/
-│   ├── db/           # Database schema + Drizzle ORM
-│   ├── ui/           # Shared UI components
-│   └── types/        # Shared TypeScript types
-├── docs/             # Research and documentation
-├── schema.sql        # PostgreSQL schema
-└── PROJECT_PLAN.md   # Implementation plan
+│   └── db/                       # Database (Drizzle ORM)
+│       ├── src/schema/           # Database schema
+│       └── drizzle.config.ts
+├── docs/                         # Research and documentation
+├── schema.sql                    # PostgreSQL schema
+├── HANDOVER.md                   # Complete project documentation
+├── QUICK_START.md                # Quick reference guide
+└── PROJECT_PLAN.md               # Original implementation plan
 ```
 
-## 🎯 Core Features (v1 MVP)
+## 🎯 Implemented Features
 
-- ✅ User authentication
-- ✅ Collection management (CRUD)
-- ✅ Card scanning with OCR
-- ✅ Multi-user collections with roles
-- ✅ Complete collection aggregation
-- ✅ Advanced filtering (color, type, CMC, keywords)
-- ✅ Deck builder with mana curve
-- ✅ Export to Moxfield/Archidekt
+**Authentication:**
+- ✅ User signup and login with Clerk
+- ✅ Protected routes and API endpoints
 
-## 🔮 Future Features (v2+)
+**Collections:**
+- ✅ Create, edit, delete collections
+- ✅ Add cards from Scryfall search
+- ✅ Update card quantities with optimistic updates
+- ✅ Remove cards from collections
+- ✅ View collection statistics
 
-- [ ] Support for Pokemon TCG, Yu-Gi-Oh
+**Card Search:**
+- ✅ Global card search with Scryfall API
+- ✅ Advanced filtering (colors, types, keywords, rarity, CMC)
+- ✅ Search within individual collections
+- ✅ Search across complete collection
+
+**Complete Collection View:**
+- ✅ Aggregated view of all cards across collections
+- ✅ Collection breakdown per card
+- ✅ Statistics (total cards, unique cards, color/rarity distribution)
+- ✅ Advanced filtering and search
+
+**Card Details:**
+- ✅ Full card modal with image, stats, legalities
+- ✅ Mana cost, power/toughness, oracle text
+- ✅ Flavor text and artist information
+
+## 🚧 Planned Features
+
+**Next Up:**
+- [ ] Deck builder with mana curve visualization
+- [ ] Deck statistics and validation
+- [ ] Add cards from collection to deck
+
+**Future:**
+- [ ] Card scanning with OCR
+- [ ] Multi-user collections with roles
+- [ ] Export to Moxfield/Archidekt
 - [ ] Price tracking integration
+- [ ] Support for Pokemon TCG, Yu-Gi-Oh
 - [ ] Trading marketplace
 - [ ] Social features (following, sharing)
-- [ ] Batch card scanning
 - [ ] Advanced analytics and insights
-- [ ] Collection value tracking
 
 ## 📖 License
 

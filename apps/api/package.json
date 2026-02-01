@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
+  "exports": {
+    "./types": "./src/types.ts",
+    "./src/router": "./src/router/index.ts"
+  },
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "build": "tsup",

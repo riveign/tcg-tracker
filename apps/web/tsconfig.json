@@ -23,7 +23,8 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@tcg-tracker/api/types": ["../api/src/types.ts"]
     }
   },
   "include": ["src"],

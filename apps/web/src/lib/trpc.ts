@@ -1,7 +1,7 @@
 import { createTRPCReact } from '@trpc/react-query'
 import { httpBatchLink } from '@trpc/client'
 import { QueryClient } from '@tanstack/react-query'
-import type { AppRouter } from '@tcg-tracker/types'
+import type { AppRouter } from '@tcg-tracker/api/types'
 
 // Create tRPC React hooks
 export const trpc = createTRPCReact<AppRouter>()

@@ -1,5 +1,5 @@
 import { pgTable, uuid, integer, jsonb, timestamp, index, unique, check } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { collections } from "./collections";
 import { cards } from "./cards";
 
@@ -47,3 +47,15 @@ export const collectionCards = pgTable(
 
 export type CollectionCard = typeof collectionCards.$inferSelect;
 export type NewCollectionCard = typeof collectionCards.$inferInsert;
+
+// Relations
+export const collectionCardsRelations = relations(collectionCards, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionCards.collectionId],
+    references: [collections.id],
+  }),
+  card: one(cards, {
+    fields: [collectionCards.cardId],
+    references: [cards.id],
+  }),
+}));
