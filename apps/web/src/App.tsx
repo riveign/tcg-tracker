@@ -14,6 +14,7 @@ import { Scan } from '@/pages/Scan'
 import { Complete } from '@/pages/Complete'
 import { Build } from '@/pages/Build'
 import { Decks } from '@/pages/Decks'
+import { DeckDetail } from '@/pages/DeckDetail'
 import { Login } from '@/pages/Login'
 import { Signup } from '@/pages/Signup'
 
@@ -76,6 +77,7 @@ function AppRoutes() {
         <Route path="scan" element={<Scan />} />
         <Route path="complete" element={<Complete />} />
         <Route path="decks" element={<Decks />} />
+        <Route path="decks/:id" element={<DeckDetail />} />
         <Route path="build" element={<Build />} />
       </Route>
 
