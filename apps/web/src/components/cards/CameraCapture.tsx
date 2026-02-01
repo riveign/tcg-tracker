@@ -37,6 +37,16 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [selectedCamera, setSelectedCamera] = useState<string>('')
 
+  // Log state changes
+  useEffect(() => {
+    console.log('[CameraCapture] State changed to:', state)
+  }, [state])
+
+  // Log captured image changes
+  useEffect(() => {
+    console.log('[CameraCapture] Captured image updated:', capturedImage ? `${capturedImage.substring(0, 50)}...` : 'null')
+  }, [capturedImage])
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -154,13 +164,28 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
   }, [stopCamera, cameras.length, enumerateCameras])
 
   const captureImage = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
+    console.log('[CameraCapture] captureImage called')
+    if (!videoRef.current || !canvasRef.current) {
+      console.error('[CameraCapture] Missing refs:', {
+        video: !!videoRef.current,
+        canvas: !!canvasRef.current,
+      })
+      return
+    }
 
     const video = videoRef.current
     const canvas = canvasRef.current
 
+    console.log('[CameraCapture] Video dimensions:', {
+      videoWidth: video.videoWidth,
+      videoHeight: video.videoHeight,
+      readyState: video.readyState,
+      paused: video.paused,
+    })
+
     // Ensure video has valid dimensions
     if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.error('[CameraCapture] Invalid video dimensions')
       setErrorMessage('Video stream not ready. Please try again.')
       setState('error')
       return
@@ -169,17 +194,29 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
 
+    console.log('[CameraCapture] Canvas dimensions set:', {
+      width: canvas.width,
+      height: canvas.height,
+    })
+
     const context = canvas.getContext('2d')
     if (!context) {
+      console.error('[CameraCapture] Failed to get canvas context')
       setErrorMessage('Failed to get canvas context.')
       setState('error')
       return
     }
 
+    console.log('[CameraCapture] Drawing image to canvas...')
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
     // Use PNG format for better compatibility with Tesseract
     const imageData = canvas.toDataURL('image/png')
+    console.log('[CameraCapture] Image captured:', {
+      dataUrlLength: imageData.length,
+      dataUrlPrefix: imageData.substring(0, 50),
+    })
+
     setCapturedImage(imageData)
     setState('captured')
     stopCamera()
@@ -313,11 +350,15 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
                 )}
 
                 {state === 'captured' && capturedImage && (
-                  <img
-                    src={capturedImage}
-                    alt="Captured card"
-                    className="w-full h-full object-contain"
-                  />
+                  <div className="w-full h-full flex items-center justify-center bg-black">
+                    <img
+                      src={capturedImage}
+                      alt="Captured card"
+                      className="w-full h-full object-contain"
+                      onLoad={() => console.log('[CameraCapture] Image loaded successfully')}
+                      onError={(e) => console.error('[CameraCapture] Image load error:', e)}
+                    />
+                  </div>
                 )}
 
                 {state === 'error' && (
@@ -330,7 +371,12 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
                   </div>
                 )}
 
-                <canvas ref={canvasRef} className="hidden" />
+                {/* Canvas for capturing - kept hidden but needs to exist in DOM */}
+                <canvas
+                  ref={canvasRef}
+                  className="hidden"
+                  style={{ display: 'none' }}
+                />
               </div>
             </CardContent>
           </Card>
