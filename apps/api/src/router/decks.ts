@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { publicProcedure, protectedProcedure, router } from '../lib/trpc';
-import { db } from '@tcg-tracker/db';
-import { decks, deckCards, cards } from '@tcg-tracker/db/schema';
+import { publicProcedure, protectedProcedure, router } from '../lib/trpc.js';
+import { db, decks, deckCards, cards } from '@tcg-tracker/db';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 
 // Input schemas
