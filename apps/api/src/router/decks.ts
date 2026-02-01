@@ -213,24 +213,42 @@ export const decksRouter = router({
         }
       }
 
-      // Add or update card in deck
-      const [deckCard] = await db
-        .insert(deckCards)
-        .values({
-          deckId: input.deckId,
-          cardId: input.cardId,
-          quantity: input.quantity,
-          cardType: input.cardType
-        })
-        .onConflictDoUpdate({
-          target: [deckCards.deckId, deckCards.cardId, deckCards.cardType],
-          set: {
+      // Check if card already exists in deck (including soft-deleted)
+      const existingCard = await db.query.deckCards.findFirst({
+        where: and(
+          eq(deckCards.deckId, input.deckId),
+          eq(deckCards.cardId, input.cardId),
+          eq(deckCards.cardType, input.cardType)
+        )
+      });
+
+      let deckCard;
+
+      if (existingCard) {
+        // Update existing card (restore if soft-deleted)
+        const [updated] = await db
+          .update(deckCards)
+          .set({
             quantity: input.quantity,
             updatedAt: new Date(),
             deletedAt: null
-          }
-        })
-        .returning();
+          })
+          .where(eq(deckCards.id, existingCard.id))
+          .returning();
+        deckCard = updated;
+      } else {
+        // Insert new card
+        const [inserted] = await db
+          .insert(deckCards)
+          .values({
+            deckId: input.deckId,
+            cardId: input.cardId,
+            quantity: input.quantity,
+            cardType: input.cardType
+          })
+          .returning();
+        deckCard = inserted;
+      }
 
       return deckCard;
     }),
