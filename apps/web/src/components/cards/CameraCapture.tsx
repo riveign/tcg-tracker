@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Camera, X, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -38,10 +38,12 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
   }, [])
 
   const startCamera = useCallback(async () => {
+    console.log('[CameraCapture] Starting camera')
     setState('requesting')
     setErrorMessage('')
 
     try {
+      console.log('[CameraCapture] Requesting getUserMedia...')
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
@@ -51,14 +53,22 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
         audio: false,
       })
 
+      console.log('[CameraCapture] Stream acquired:', stream.id)
       streamRef.current = stream
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        console.log('[CameraCapture] Starting video playback...')
         await videoRef.current.play()
+        console.log('[CameraCapture] Video playing, setting state to streaming')
         setState('streaming')
+      } else {
+        console.error('[CameraCapture] videoRef.current is null')
+        setState('error')
+        setErrorMessage('Video element not ready. Please try again.')
       }
     } catch (error) {
+      console.error('[CameraCapture] Camera error:', error)
       setState('error')
 
       if (error instanceof Error) {
@@ -99,19 +109,22 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     setCapturedImage(imageData)
     setState('captured')
     stopCamera()
-  }, [stopCamera])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const retakePhoto = useCallback(() => {
     setCapturedImage(null)
     setState('idle')
     startCamera()
-  }, [startCamera])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const confirmCapture = useCallback(() => {
     if (capturedImage) {
       onCapture(capturedImage)
       handleClose()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturedImage, onCapture])
 
   const handleClose = useCallback(() => {
@@ -120,17 +133,23 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     setState('idle')
     setErrorMessage('')
     onClose?.()
-  }, [stopCamera, onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose])
 
   useEffect(() => {
+    console.log('[CameraCapture] useEffect triggered - isOpen:', isOpen, 'state:', state)
+
     if (isOpen && state === 'idle') {
+      console.log('[CameraCapture] Conditions met, calling startCamera')
       startCamera()
     }
 
     return () => {
+      console.log('[CameraCapture] Cleanup - stopping camera')
       stopCamera()
     }
-  }, [isOpen, state, startCamera, stopCamera])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, state])
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
