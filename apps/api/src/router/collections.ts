@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../lib/trpc.js';
 import { db, collections, collectionCards, cards } from '@tcg-tracker/db';
-import { eq, and, isNull, sql, or, ilike } from 'drizzle-orm';
+import { eq, and, isNull, sql, ilike } from 'drizzle-orm';
 import { getCardById, transformScryfallCard } from '../lib/scryfall.js';
+import { handlePromise } from '../lib/utils.js';
 
 const createCollectionSchema = z.object({
   name: z.string().min(1, 'Collection name is required').max(255),
@@ -58,21 +59,30 @@ export const collectionsRouter = router({
    * List all collections for the current user
    */
   list: protectedProcedure.query(async ({ ctx }) => {
-    const userCollections = await db.query.collections.findMany({
-      where: and(
-        eq(collections.ownerId, ctx.user.userId),
-        isNull(collections.deletedAt)
-      ),
-      orderBy: (collections, { desc }) => [desc(collections.updatedAt)],
-      columns: {
-        id: true,
-        name: true,
-        description: true,
-        isPublic: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const { data: userCollections, error } = await handlePromise(
+      db.query.collections.findMany({
+        where: and(
+          eq(collections.ownerId, ctx.user.userId),
+          isNull(collections.deletedAt)
+        ),
+        orderBy: (collections, { desc }) => [desc(collections.updatedAt)],
+        columns: {
+          id: true,
+          name: true,
+          description: true,
+          isPublic: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+    );
+
+    if (error) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch collections',
+      });
+    }
 
     return userCollections;
   }),
@@ -83,21 +93,30 @@ export const collectionsRouter = router({
   get: protectedProcedure
     .input(getCollectionSchema)
     .query(async ({ input, ctx }) => {
-      const collection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, input.id),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-        columns: {
-          id: true,
-          name: true,
-          description: true,
-          isPublic: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      });
+      const { data: collection, error } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, input.id),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+          columns: {
+            id: true,
+            name: true,
+            description: true,
+            isPublic: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+      );
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch collection',
+        });
+      }
 
       if (!collection) {
         throw new TRPCError({
@@ -117,22 +136,33 @@ export const collectionsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { name, description, isPublic } = input;
 
-      const [newCollection] = await db
-        .insert(collections)
-        .values({
-          name,
-          description: description || null,
-          isPublic,
-          ownerId: ctx.user.userId,
-        })
-        .returning({
-          id: collections.id,
-          name: collections.name,
-          description: collections.description,
-          isPublic: collections.isPublic,
-          createdAt: collections.createdAt,
-          updatedAt: collections.updatedAt,
+      const { data: insertResult, error: insertError } = await handlePromise(
+        db
+          .insert(collections)
+          .values({
+            name,
+            description: description || null,
+            isPublic,
+            ownerId: ctx.user.userId,
+          })
+          .returning({
+            id: collections.id,
+            name: collections.name,
+            description: collections.description,
+            isPublic: collections.isPublic,
+            createdAt: collections.createdAt,
+            updatedAt: collections.updatedAt,
+          })
+      );
+
+      if (insertError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create collection',
         });
+      }
+
+      const [newCollection] = insertResult;
 
       if (!newCollection) {
         throw new TRPCError({
@@ -153,13 +183,22 @@ export const collectionsRouter = router({
       const { id, ...updateData } = input;
 
       // Verify ownership
-      const existingCollection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, id),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: existingCollection, error: fetchError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, id),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (fetchError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!existingCollection) {
         throw new TRPCError({
@@ -185,17 +224,28 @@ export const collectionsRouter = router({
         updateFields.isPublic = updateData.isPublic;
       }
 
-      const [updatedCollection] = await db
-        .update(collections)
-        .set(updateFields)
-        .where(eq(collections.id, id))
-        .returning({
-          id: collections.id,
-          name: collections.name,
-          description: collections.description,
-          isPublic: collections.isPublic,
-          updatedAt: collections.updatedAt,
+      const { data: updateResult, error: updateError } = await handlePromise(
+        db
+          .update(collections)
+          .set(updateFields)
+          .where(eq(collections.id, id))
+          .returning({
+            id: collections.id,
+            name: collections.name,
+            description: collections.description,
+            isPublic: collections.isPublic,
+            updatedAt: collections.updatedAt,
+          })
+      );
+
+      if (updateError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update collection',
         });
+      }
+
+      const [updatedCollection] = updateResult;
 
       if (!updatedCollection) {
         throw new TRPCError({
@@ -214,13 +264,22 @@ export const collectionsRouter = router({
     .input(deleteCollectionSchema)
     .mutation(async ({ input, ctx }) => {
       // Verify ownership
-      const existingCollection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, input.id),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: existingCollection, error: fetchError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, input.id),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (fetchError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!existingCollection) {
         throw new TRPCError({
@@ -230,12 +289,21 @@ export const collectionsRouter = router({
       }
 
       // Soft delete
-      await db
-        .update(collections)
-        .set({
-          deletedAt: sql`NOW()`,
-        })
-        .where(eq(collections.id, input.id));
+      const { error: deleteError } = await handlePromise(
+        db
+          .update(collections)
+          .set({
+            deletedAt: sql`NOW()`,
+          })
+          .where(eq(collections.id, input.id))
+      );
+
+      if (deleteError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to delete collection',
+        });
+      }
 
       return { success: true };
     }),
@@ -250,13 +318,22 @@ export const collectionsRouter = router({
       const { collectionId, cardId, quantity, metadata } = input;
 
       // Verify collection ownership
-      const collection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, collectionId),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: collection, error: collectionError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (collectionError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!collection) {
         throw new TRPCError({
@@ -266,12 +343,23 @@ export const collectionsRouter = router({
       }
 
       // Check if card exists in our database
-      let card = await db.query.cards.findFirst({
-        where: eq(cards.id, cardId),
-      });
+      const { data: card, error: cardFetchError } = await handlePromise(
+        db.query.cards.findFirst({
+          where: eq(cards.id, cardId),
+        })
+      );
+
+      if (cardFetchError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch card from database',
+        });
+      }
+
+      let finalCard = card;
 
       // If not, fetch from Scryfall and cache it
-      if (!card) {
+      if (!finalCard) {
         const scryfallCard = await getCardById(cardId);
 
         if (!scryfallCard) {
@@ -283,14 +371,25 @@ export const collectionsRouter = router({
 
         const transformedCard = transformScryfallCard(scryfallCard);
 
-        const [newCard] = await db
-          .insert(cards)
-          .values(transformedCard)
-          .onConflictDoUpdate({
-            target: cards.id,
-            set: { updatedAt: new Date() },
-          })
-          .returning();
+        const { data: insertResult, error: cardInsertError } = await handlePromise(
+          db
+            .insert(cards)
+            .values(transformedCard)
+            .onConflictDoUpdate({
+              target: cards.id,
+              set: { updatedAt: new Date() },
+            })
+            .returning()
+        );
+
+        if (cardInsertError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to cache card',
+          });
+        }
+
+        const [newCard] = insertResult;
 
         if (!newCard) {
           throw new TRPCError({
@@ -299,44 +398,73 @@ export const collectionsRouter = router({
           });
         }
 
-        card = newCard;
+        finalCard = newCard;
       }
 
       // Check if card is already in collection
-      const existingCollectionCard = await db.query.collectionCards.findFirst({
-        where: and(
-          eq(collectionCards.collectionId, collectionId),
-          eq(collectionCards.cardId, cardId),
-          isNull(collectionCards.deletedAt)
-        ),
-      });
+      const { data: existingCollectionCard, error: existingCardError } = await handlePromise(
+        db.query.collectionCards.findFirst({
+          where: and(
+            eq(collectionCards.collectionId, collectionId),
+            eq(collectionCards.cardId, cardId),
+            isNull(collectionCards.deletedAt)
+          ),
+        })
+      );
+
+      if (existingCardError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to check if card is already in collection',
+        });
+      }
 
       let collectionCard;
 
       if (existingCollectionCard) {
         // Update quantity
-        const [updated] = await db
-          .update(collectionCards)
-          .set({
-            quantity: existingCollectionCard.quantity + quantity,
-            updatedAt: sql`NOW()`,
-          })
-          .where(eq(collectionCards.id, existingCollectionCard.id))
-          .returning();
+        const { data: updateResult, error: updateError } = await handlePromise(
+          db
+            .update(collectionCards)
+            .set({
+              quantity: existingCollectionCard.quantity + quantity,
+              updatedAt: sql`NOW()`,
+            })
+            .where(eq(collectionCards.id, existingCollectionCard.id))
+            .returning()
+        );
 
+        if (updateError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update card quantity in collection',
+          });
+        }
+
+        const [updated] = updateResult;
         collectionCard = updated;
       } else {
         // Add new card to collection
-        const [inserted] = await db
-          .insert(collectionCards)
-          .values({
-            collectionId,
-            cardId,
-            quantity,
-            cardMetadata: metadata || {},
-          })
-          .returning();
+        const { data: insertResult, error: insertError } = await handlePromise(
+          db
+            .insert(collectionCards)
+            .values({
+              collectionId,
+              cardId,
+              quantity,
+              cardMetadata: metadata || {},
+            })
+            .returning()
+        );
 
+        if (insertError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to add card to collection',
+          });
+        }
+
+        const [inserted] = insertResult;
         collectionCard = inserted;
       }
 
@@ -362,13 +490,22 @@ export const collectionsRouter = router({
       const { collectionId } = input;
 
       // Verify collection ownership
-      const collection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, collectionId),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: collection, error: collectionError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (collectionError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!collection) {
         throw new TRPCError({
@@ -378,16 +515,25 @@ export const collectionsRouter = router({
       }
 
       // Get all cards in the collection with full card details
-      const collectionCardsWithDetails = await db.query.collectionCards.findMany({
-        where: and(
-          eq(collectionCards.collectionId, collectionId),
-          isNull(collectionCards.deletedAt)
-        ),
-        with: {
-          card: true,
-        },
-        orderBy: (collectionCards, { desc }) => [desc(collectionCards.createdAt)],
-      });
+      const { data: collectionCardsWithDetails, error: cardsError } = await handlePromise(
+        db.query.collectionCards.findMany({
+          where: and(
+            eq(collectionCards.collectionId, collectionId),
+            isNull(collectionCards.deletedAt)
+          ),
+          with: {
+            card: true,
+          },
+          orderBy: (collectionCards, { desc }) => [desc(collectionCards.createdAt)],
+        })
+      );
+
+      if (cardsError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch collection cards',
+        });
+      }
 
       return collectionCardsWithDetails.map((cc) => ({
         id: cc.id,
@@ -407,13 +553,22 @@ export const collectionsRouter = router({
       const { collectionId, cardId, quantity } = input;
 
       // Verify collection ownership
-      const collection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, collectionId),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: collection, error: collectionError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (collectionError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!collection) {
         throw new TRPCError({
@@ -423,13 +578,22 @@ export const collectionsRouter = router({
       }
 
       // Find the collection card
-      const collectionCard = await db.query.collectionCards.findFirst({
-        where: and(
-          eq(collectionCards.collectionId, collectionId),
-          eq(collectionCards.cardId, cardId),
-          isNull(collectionCards.deletedAt)
-        ),
-      });
+      const { data: collectionCard, error: cardError } = await handlePromise(
+        db.query.collectionCards.findFirst({
+          where: and(
+            eq(collectionCards.collectionId, collectionId),
+            eq(collectionCards.cardId, cardId),
+            isNull(collectionCards.deletedAt)
+          ),
+        })
+      );
+
+      if (cardError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to find card in collection',
+        });
+      }
 
       if (!collectionCard) {
         throw new TRPCError({
@@ -439,14 +603,25 @@ export const collectionsRouter = router({
       }
 
       // Update quantity
-      const [updated] = await db
-        .update(collectionCards)
-        .set({
-          quantity,
-          updatedAt: sql`NOW()`,
-        })
-        .where(eq(collectionCards.id, collectionCard.id))
-        .returning();
+      const { data: updateResult, error: updateError } = await handlePromise(
+        db
+          .update(collectionCards)
+          .set({
+            quantity,
+            updatedAt: sql`NOW()`,
+          })
+          .where(eq(collectionCards.id, collectionCard.id))
+          .returning()
+      );
+
+      if (updateError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update card quantity',
+        });
+      }
+
+      const [updated] = updateResult;
 
       if (!updated) {
         throw new TRPCError({
@@ -467,13 +642,22 @@ export const collectionsRouter = router({
       const { collectionId, cardId } = input;
 
       // Verify collection ownership
-      const collection = await db.query.collections.findFirst({
-        where: and(
-          eq(collections.id, collectionId),
-          eq(collections.ownerId, ctx.user.userId),
-          isNull(collections.deletedAt)
-        ),
-      });
+      const { data: collection, error: collectionError } = await handlePromise(
+        db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        })
+      );
+
+      if (collectionError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify collection ownership',
+        });
+      }
 
       if (!collection) {
         throw new TRPCError({
@@ -483,13 +667,22 @@ export const collectionsRouter = router({
       }
 
       // Find the collection card
-      const collectionCard = await db.query.collectionCards.findFirst({
-        where: and(
-          eq(collectionCards.collectionId, collectionId),
-          eq(collectionCards.cardId, cardId),
-          isNull(collectionCards.deletedAt)
-        ),
-      });
+      const { data: collectionCard, error: cardError } = await handlePromise(
+        db.query.collectionCards.findFirst({
+          where: and(
+            eq(collectionCards.collectionId, collectionId),
+            eq(collectionCards.cardId, cardId),
+            isNull(collectionCards.deletedAt)
+          ),
+        })
+      );
+
+      if (cardError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to find card in collection',
+        });
+      }
 
       if (!collectionCard) {
         throw new TRPCError({
@@ -499,12 +692,21 @@ export const collectionsRouter = router({
       }
 
       // Soft delete
-      await db
-        .update(collectionCards)
-        .set({
-          deletedAt: sql`NOW()`,
-        })
-        .where(eq(collectionCards.id, collectionCard.id));
+      const { error: deleteError } = await handlePromise(
+        db
+          .update(collectionCards)
+          .set({
+            deletedAt: sql`NOW()`,
+          })
+          .where(eq(collectionCards.id, collectionCard.id))
+      );
+
+      if (deleteError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to remove card from collection',
+        });
+      }
 
       return { success: true };
     }),
@@ -533,13 +735,22 @@ export const collectionsRouter = router({
 
       // If specific collection, verify ownership
       if (collectionId) {
-        const collection = await db.query.collections.findFirst({
-          where: and(
-            eq(collections.id, collectionId),
-            eq(collections.ownerId, ctx.user.userId),
-            isNull(collections.deletedAt)
-          ),
-        });
+        const { data: collection, error: collectionError } = await handlePromise(
+          db.query.collections.findFirst({
+            where: and(
+              eq(collections.id, collectionId),
+              eq(collections.ownerId, ctx.user.userId),
+              isNull(collections.deletedAt)
+            ),
+          })
+        );
+
+        if (collectionError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify collection ownership',
+          });
+        }
 
         if (!collection) {
           throw new TRPCError({
@@ -550,32 +761,42 @@ export const collectionsRouter = router({
       }
 
       // Search for cards in the collection(s) by name
-      const searchResults = await db
-        .select({
-          id: cards.id,
-          name: cards.name,
-          typeLine: cards.typeLine,
-          manaCost: cards.manaCost,
-          setCode: cards.setCode,
-          setName: cards.setName,
-          collectorNumber: cards.collectorNumber,
-          rarity: cards.rarity,
-          imageUris: cards.imageUris,
-          quantity: collectionCards.quantity,
-          collectionId: collectionCards.collectionId,
-        })
-        .from(collectionCards)
-        .innerJoin(cards, eq(collectionCards.cardId, cards.id))
-        .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
-        .where(
-          and(
-            collectionFilter,
-            ilike(cards.name, `%${query}%`)
+      const { data: searchResults, error: searchError } = await handlePromise(
+        db
+          .select({
+            id: cards.id,
+            name: cards.name,
+            typeLine: cards.typeLine,
+            manaCost: cards.manaCost,
+            setCode: cards.setCode,
+            setName: cards.setName,
+            collectorNumber: cards.collectorNumber,
+            rarity: cards.rarity,
+            imageUris: cards.imageUris,
+            quantity: collectionCards.quantity,
+            collectionId: collectionCards.collectionId,
+          })
+          .from(collectionCards)
+          .innerJoin(cards, eq(collectionCards.cardId, cards.id))
+          .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
+          .where(
+            and(
+              collectionFilter,
+              ilike(cards.name, `%${query}%`)
+            )
           )
-        )
-        .limit(50);
+          .limit(50)
+      );
+
+      if (searchError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to search collection cards',
+        });
+      }
 
       // Transform results to match Scryfall card format expected by frontend
+      // Note: imageUris is stored as JSONB and matches Scryfall's structure
       return searchResults.map((result) => ({
         id: result.id,
         name: result.name,

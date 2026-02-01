@@ -222,6 +222,8 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     setCapturedImage(imageData)
     setState('captured')
     stopCamera()
+    // Intentionally omit stopCamera from dependencies to keep callback stable
+    // stopCamera itself is memoized and doesn't need to trigger callback recreation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -229,6 +231,8 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     setCapturedImage(null)
     setState('idle')
     startCamera()
+    // Intentionally omit startCamera from dependencies to keep callback stable
+    // startCamera itself is memoized and doesn't need to trigger callback recreation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -237,6 +241,8 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
       onCapture(capturedImage)
       handleClose()
     }
+    // Intentionally omit handleClose from dependencies as it's a stable memoized function
+    // and we don't want to recreate this callback when handleClose changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturedImage, onCapture])
 
@@ -246,6 +252,8 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     setState('idle')
     setErrorMessage('')
     onClose?.()
+    // Intentionally omit stopCamera from dependencies to keep callback stable
+    // stopCamera itself is memoized and doesn't need to trigger callback recreation
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose])
 
@@ -261,6 +269,9 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
       console.log('[CameraCapture] Cleanup - stopping camera')
       stopCamera()
     }
+    // Intentionally omit stopCamera and startCamera from dependencies
+    // These are memoized functions that don't need to trigger effect recreation
+    // Only re-run effect when isOpen or state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, state])
 
@@ -277,19 +288,44 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
         console.log('[CameraCapture] Video element ready state:', videoRef.current.readyState)
 
         const video = videoRef.current
-        video.srcObject = streamRef.current
+        let pollIntervalId: NodeJS.Timeout | null = null
+        let hasMetadataFired = false
 
         // Add loadedmetadata event listener to track when video dimensions are ready
         const handleLoadedMetadata = () => {
-          console.log('[CameraCapture] Video metadata loaded:', {
+          if (hasMetadataFired) return
+          hasMetadataFired = true
+
+          console.log('[CameraCapture] Video metadata loaded (via event):', {
             videoWidth: video.videoWidth,
             videoHeight: video.videoHeight,
             readyState: video.readyState,
           })
           setIsVideoReady(video.videoWidth > 0 && video.videoHeight > 0)
+
+          // Clear polling if it was started
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId)
+            pollIntervalId = null
+          }
         }
 
+        // Attach listener BEFORE setting srcObject
         video.addEventListener('loadedmetadata', handleLoadedMetadata)
+
+        // Set the stream
+        video.srcObject = streamRef.current
+
+        // Check if metadata is already loaded (event may have fired before listener attached)
+        if (video.readyState >= 1 && video.videoWidth > 0 && video.videoHeight > 0) {
+          console.log('[CameraCapture] Video metadata already loaded:', {
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            readyState: video.readyState,
+          })
+          hasMetadataFired = true
+          setIsVideoReady(true)
+        }
 
         try {
           console.log('[CameraCapture] Attempting to play video...')
@@ -299,15 +335,51 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
             videoHeight: video.videoHeight,
             readyState: video.readyState,
           })
+
+          // If metadata still not ready after play, start polling as fallback
+          if (!hasMetadataFired) {
+            console.log('[CameraCapture] Starting dimension polling fallback')
+            let pollAttempts = 0
+            const maxPollAttempts = 30 // 3 seconds at 100ms intervals
+
+            pollIntervalId = setInterval(() => {
+              pollAttempts++
+
+              if (video.videoWidth > 0 && video.videoHeight > 0) {
+                console.log('[CameraCapture] Video metadata loaded (via polling):', {
+                  videoWidth: video.videoWidth,
+                  videoHeight: video.videoHeight,
+                  readyState: video.readyState,
+                  attempts: pollAttempts,
+                })
+                hasMetadataFired = true
+                setIsVideoReady(true)
+
+                if (pollIntervalId) {
+                  clearInterval(pollIntervalId)
+                  pollIntervalId = null
+                }
+              } else if (pollAttempts >= maxPollAttempts) {
+                console.error('[CameraCapture] Polling timeout - metadata not loaded after 3s')
+                if (pollIntervalId) {
+                  clearInterval(pollIntervalId)
+                  pollIntervalId = null
+                }
+              }
+            }, 100)
+          }
         } catch (error) {
           console.error('[CameraCapture] Video playback error:', error)
           setState('error')
           setErrorMessage('Failed to start video playback. Please try again.')
         }
 
-        // Cleanup event listener
+        // Cleanup event listener and polling
         return () => {
           video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId)
+          }
         }
       }
     }

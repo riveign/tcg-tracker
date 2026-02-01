@@ -57,6 +57,7 @@ export const DeckDialog = ({
   const utils = trpc.useUtils()
   const isEditing = Boolean(deckId)
 
+  // Safe to use deckId! because query is only enabled when isEditing && Boolean(deckId)
   const { data: deck } = trpc.decks.get.useQuery(
     { deckId: deckId! },
     { enabled: isEditing && Boolean(deckId) }
@@ -84,6 +85,8 @@ export const DeckDialog = ({
       form.reset({
         name: deck.name,
         description: deck.description || '',
+        // Type assertion needed because deck.format comes from DB as string
+        // but form expects the specific enum type
         format: deck.format as any || undefined,
         collectionOnly: deck.collectionOnly || false,
         collectionId: deck.collectionId || null,

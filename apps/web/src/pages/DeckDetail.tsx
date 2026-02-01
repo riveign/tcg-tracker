@@ -17,6 +17,8 @@ export function DeckDetail() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'mainboard' | 'sideboard'>('mainboard');
 
+  // Safe to use id! because queries are only enabled when id exists
+  // and we have early return guard below at line 48-56
   const { data: deck, isLoading } = trpc.decks.get.useQuery(
     { deckId: id! },
     { enabled: !!id }
@@ -43,6 +45,7 @@ export function DeckDetail() {
       return;
     }
 
+    // Safe to use id! because we have deck loaded (checked above) which means id exists
     await deleteDeckMutation.mutateAsync({ deckId: id! });
   };
 
@@ -80,6 +83,8 @@ export function DeckDetail() {
   const sideboardCards = deck.cards.filter(c => c.cardType === 'sideboard');
   const commanderCards = deck.cards.filter(c => c.cardType === 'commander');
 
+  // At this point id is guaranteed to exist (early returns above handle missing id)
+  // So all id! usages below in JSX are safe
   return (
     <div className="container mx-auto p-4 space-y-4">
       {/* Header */}
