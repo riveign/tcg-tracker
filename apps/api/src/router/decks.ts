@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { publicProcedure, protectedProcedure, router } from '../lib/trpc.js';
 import { db, decks, deckCards, cards, collections, collectionCards } from '@tcg-tracker/db';
 import { eq, and, isNull, sql } from 'drizzle-orm';
+import { handlePromise } from '../lib/utils.js';
 
 // Input schemas
 const createDeckSchema = z.object({
@@ -45,13 +47,23 @@ export const decksRouter = router({
   // List all decks for authenticated user
   list: protectedProcedure
     .query(async ({ ctx }) => {
-      const userDecks = await db.query.decks.findMany({
-        where: and(
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        ),
-        orderBy: (decks, { desc }) => [desc(decks.updatedAt)]
-      });
+      const { data: userDecks, error } = await handlePromise(
+        db.query.decks.findMany({
+          where: and(
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          ),
+          orderBy: (decks, { desc }) => [desc(decks.updatedAt)]
+        })
+      );
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch decks',
+        });
+      }
+
       return userDecks;
     }),
 
@@ -59,32 +71,53 @@ export const decksRouter = router({
   get: protectedProcedure
     .input(z.object({ deckId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      const deck = await db.query.decks.findFirst({
-        where: and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        )
-      });
+      const { data: deck, error } = await handlePromise(
+        db.query.decks.findFirst({
+          where: and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          )
+        })
+      );
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch deck',
+        });
+      }
 
       if (!deck) {
-        throw new Error('Deck not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
       }
 
       // Get all cards in deck
-      const deckCardsList = await db
-        .select({
-          id: deckCards.id,
-          quantity: deckCards.quantity,
-          cardType: deckCards.cardType,
-          card: cards
-        })
-        .from(deckCards)
-        .innerJoin(cards, eq(deckCards.cardId, cards.id))
-        .where(and(
-          eq(deckCards.deckId, input.deckId),
-          isNull(deckCards.deletedAt)
-        ));
+      const { data: deckCardsList, error: cardsError } = await handlePromise(
+        db
+          .select({
+            id: deckCards.id,
+            quantity: deckCards.quantity,
+            cardType: deckCards.cardType,
+            card: cards
+          })
+          .from(deckCards)
+          .innerJoin(cards, eq(deckCards.cardId, cards.id))
+          .where(and(
+            eq(deckCards.deckId, input.deckId),
+            isNull(deckCards.deletedAt)
+          ))
+      );
+
+      if (cardsError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch deck cards',
+        });
+      }
 
       return {
         ...deck,
@@ -98,28 +131,50 @@ export const decksRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Validate collection ownership if collectionId is provided
       if (input.collectionId) {
-        const collection = await db.query.collections.findFirst({
-          where: and(
-            eq(collections.id, input.collectionId),
-            eq(collections.ownerId, ctx.user.userId),
-            isNull(collections.deletedAt)
-          )
-        });
+        const { data: collection, error: collectionError } = await handlePromise(
+          db.query.collections.findFirst({
+            where: and(
+              eq(collections.id, input.collectionId),
+              eq(collections.ownerId, ctx.user.userId),
+              isNull(collections.deletedAt)
+            )
+          })
+        );
+
+        if (collectionError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to validate collection',
+          });
+        }
 
         if (!collection) {
-          throw new Error('Collection not found or you do not have access to it');
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Collection not found or you do not have access to it',
+          });
         }
       }
 
-      const [newDeck] = await db.insert(decks).values({
-        name: input.name,
-        description: input.description,
-        format: input.format,
-        collectionOnly: input.collectionOnly,
-        collectionId: input.collectionId,
-        ownerId: ctx.user.userId
-      }).returning();
+      const { data: insertResult, error: insertError } = await handlePromise(
+        db.insert(decks).values({
+          name: input.name,
+          description: input.description,
+          format: input.format,
+          collectionOnly: input.collectionOnly,
+          collectionId: input.collectionId,
+          ownerId: ctx.user.userId
+        }).returning()
+      );
 
+      if (insertError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create deck',
+        });
+      }
+
+      const [newDeck] = insertResult;
       return newDeck;
     }),
 
@@ -129,21 +184,34 @@ export const decksRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { deckId, ...updates } = input;
 
-      const [updatedDeck] = await db
-        .update(decks)
-        .set({
-          ...updates,
-          updatedAt: new Date()
-        })
-        .where(and(
-          eq(decks.id, deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        ))
-        .returning();
+      const { data: updateResult, error: updateError } = await handlePromise(
+        db
+          .update(decks)
+          .set({
+            ...updates,
+            updatedAt: new Date()
+          })
+          .where(and(
+            eq(decks.id, deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          ))
+          .returning()
+      );
 
+      if (updateError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update deck',
+        });
+      }
+
+      const [updatedDeck] = updateResult;
       if (!updatedDeck) {
-        throw new Error('Deck not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
       }
 
       return updatedDeck;
@@ -153,17 +221,29 @@ export const decksRouter = router({
   delete: protectedProcedure
     .input(z.object({ deckId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      const result = await db
-        .update(decks)
-        .set({ deletedAt: new Date() })
-        .where(and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId)
-        ))
-        .returning();
+      const { data: result, error } = await handlePromise(
+        db
+          .update(decks)
+          .set({ deletedAt: new Date() })
+          .where(and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId)
+          ))
+          .returning()
+      );
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to delete deck',
+        });
+      }
 
       if (result.length === 0) {
-        throw new Error('Deck not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
       }
 
       return { success: true };
@@ -174,71 +254,73 @@ export const decksRouter = router({
     .input(addCardToDeckSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify deck ownership
-      const deck = await db.query.decks.findFirst({
-        where: and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        )
-      });
+      const { data: deck, error: deckError } = await handlePromise(
+        db.query.decks.findFirst({
+          where: and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          )
+        })
+      );
+
+      if (deckError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify deck ownership',
+        });
+      }
 
       if (!deck) {
-        throw new Error('Deck not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
       }
 
       // If deck is collection-only, verify card exists in the specified collection(s)
       if (deck.collectionOnly) {
-        const cardInCollectionQuery = db
-          .select({ id: collectionCards.id })
-          .from(collectionCards)
-          .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
-          .where(and(
-            eq(collectionCards.cardId, input.cardId),
-            eq(collections.ownerId, ctx.user.userId),
-            isNull(collectionCards.deletedAt),
-            isNull(collections.deletedAt),
-            // If deck has a specific collectionId, only check that collection
-            deck.collectionId ? eq(collections.id, deck.collectionId) : sql`true`
-          ))
-          .limit(1);
+        const { data: cardInCollection, error: collectionCheckError } = await handlePromise(
+          db
+            .select({ id: collectionCards.id })
+            .from(collectionCards)
+            .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
+            .where(and(
+              eq(collectionCards.cardId, input.cardId),
+              eq(collections.ownerId, ctx.user.userId),
+              isNull(collectionCards.deletedAt),
+              isNull(collections.deletedAt),
+              // If deck has a specific collectionId, only check that collection
+              deck.collectionId ? eq(collections.id, deck.collectionId) : sql`true`
+            ))
+            .limit(1)
+        );
 
-        const cardInCollection = await cardInCollectionQuery;
+        if (collectionCheckError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to verify card in collection',
+          });
+        }
 
         if (cardInCollection.length === 0) {
           if (deck.collectionId) {
-            throw new Error('This deck only allows cards from the linked collection. Add this card to the collection first.');
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'This deck only allows cards from the linked collection. Add this card to the collection first.',
+            });
           } else {
-            throw new Error('This deck only allows cards from your collections. Add this card to a collection first.');
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'This deck only allows cards from your collections. Add this card to a collection first.',
+            });
           }
         }
       }
 
-      // Check if card already exists in deck (including soft-deleted)
-      const existingCard = await db.query.deckCards.findFirst({
-        where: and(
-          eq(deckCards.deckId, input.deckId),
-          eq(deckCards.cardId, input.cardId),
-          eq(deckCards.cardType, input.cardType)
-        )
-      });
-
-      let deckCard;
-
-      if (existingCard) {
-        // Update existing card (restore if soft-deleted)
-        const [updated] = await db
-          .update(deckCards)
-          .set({
-            quantity: input.quantity,
-            updatedAt: new Date(),
-            deletedAt: null
-          })
-          .where(eq(deckCards.id, existingCard.id))
-          .returning();
-        deckCard = updated;
-      } else {
-        // Insert new card
-        const [inserted] = await db
+      // Add or update card in deck
+      const { data: insertResult, error: insertError } = await handlePromise(
+        db
           .insert(deckCards)
           .values({
             deckId: input.deckId,
@@ -246,10 +328,25 @@ export const decksRouter = router({
             quantity: input.quantity,
             cardType: input.cardType
           })
-          .returning();
-        deckCard = inserted;
+          .onConflictDoUpdate({
+            target: [deckCards.deckId, deckCards.cardId, deckCards.cardType],
+            set: {
+              quantity: input.quantity,
+              updatedAt: new Date(),
+              deletedAt: null
+            }
+          })
+          .returning()
+      );
+
+      if (insertError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to add card to deck',
+        });
       }
 
+      const [deckCard] = insertResult;
       return deckCard;
     }),
 
@@ -258,41 +355,71 @@ export const decksRouter = router({
     .input(updateCardQuantitySchema)
     .mutation(async ({ ctx, input }) => {
       // Verify deck ownership
-      const deck = await db.query.decks.findFirst({
-        where: and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        )
-      });
+      const { data: deck, error: deckError } = await handlePromise(
+        db.query.decks.findFirst({
+          where: and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          )
+        })
+      );
+
+      if (deckError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify deck ownership',
+        });
+      }
 
       if (!deck) {
-        throw new Error('Deck not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
       }
 
       if (input.quantity === 0) {
         // Remove card if quantity is 0
-        await db
-          .update(deckCards)
-          .set({ deletedAt: new Date() })
-          .where(and(
-            eq(deckCards.deckId, input.deckId),
-            eq(deckCards.cardId, input.cardId),
-            eq(deckCards.cardType, input.cardType)
-          ));
+        const { error: deleteError } = await handlePromise(
+          db
+            .update(deckCards)
+            .set({ deletedAt: new Date() })
+            .where(and(
+              eq(deckCards.deckId, input.deckId),
+              eq(deckCards.cardId, input.cardId),
+              eq(deckCards.cardType, input.cardType)
+            ))
+        );
+
+        if (deleteError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to remove card from deck',
+          });
+        }
       } else {
-        await db
-          .update(deckCards)
-          .set({
-            quantity: input.quantity,
-            updatedAt: new Date()
-          })
-          .where(and(
-            eq(deckCards.deckId, input.deckId),
-            eq(deckCards.cardId, input.cardId),
-            eq(deckCards.cardType, input.cardType),
-            isNull(deckCards.deletedAt)
-          ));
+        const { error: updateError } = await handlePromise(
+          db
+            .update(deckCards)
+            .set({
+              quantity: input.quantity,
+              updatedAt: new Date()
+            })
+            .where(and(
+              eq(deckCards.deckId, input.deckId),
+              eq(deckCards.cardId, input.cardId),
+              eq(deckCards.cardType, input.cardType),
+              isNull(deckCards.deletedAt)
+            ))
+        );
+
+        if (updateError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update card quantity',
+          });
+        }
       }
 
       return { success: true };
@@ -303,26 +430,47 @@ export const decksRouter = router({
     .input(removeCardSchema)
     .mutation(async ({ ctx, input }) => {
       // Verify deck ownership
-      const deck = await db.query.decks.findFirst({
-        where: and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        )
-      });
+      const { data: deck, error: deckError } = await handlePromise(
+        db.query.decks.findFirst({
+          where: and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          )
+        })
+      );
 
-      if (!deck) {
-        throw new Error('Deck not found');
+      if (deckError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify deck ownership',
+        });
       }
 
-      await db
-        .update(deckCards)
-        .set({ deletedAt: new Date() })
-        .where(and(
-          eq(deckCards.deckId, input.deckId),
-          eq(deckCards.cardId, input.cardId),
-          eq(deckCards.cardType, input.cardType)
-        ));
+      if (!deck) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
+      }
+
+      const { error: deleteError } = await handlePromise(
+        db
+          .update(deckCards)
+          .set({ deletedAt: new Date() })
+          .where(and(
+            eq(deckCards.deckId, input.deckId),
+            eq(deckCards.cardId, input.cardId),
+            eq(deckCards.cardType, input.cardType)
+          ))
+      );
+
+      if (deleteError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to remove card from deck',
+        });
+      }
 
       return { success: true };
     }),
@@ -332,30 +480,51 @@ export const decksRouter = router({
     .input(z.object({ deckId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       // Verify deck ownership
-      const deck = await db.query.decks.findFirst({
-        where: and(
-          eq(decks.id, input.deckId),
-          eq(decks.ownerId, ctx.user.userId),
-          isNull(decks.deletedAt)
-        )
-      });
+      const { data: deck, error: deckError } = await handlePromise(
+        db.query.decks.findFirst({
+          where: and(
+            eq(decks.id, input.deckId),
+            eq(decks.ownerId, ctx.user.userId),
+            isNull(decks.deletedAt)
+          )
+        })
+      );
 
-      if (!deck) {
-        throw new Error('Deck not found');
+      if (deckError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to verify deck ownership',
+        });
       }
 
-      const deckCardsList = await db
-        .select({
-          quantity: deckCards.quantity,
-          cardType: deckCards.cardType,
-          card: cards
-        })
-        .from(deckCards)
-        .innerJoin(cards, eq(deckCards.cardId, cards.id))
-        .where(and(
-          eq(deckCards.deckId, input.deckId),
-          isNull(deckCards.deletedAt)
-        ));
+      if (!deck) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Deck not found',
+        });
+      }
+
+      const { data: deckCardsList, error: cardsError } = await handlePromise(
+        db
+          .select({
+            quantity: deckCards.quantity,
+            cardType: deckCards.cardType,
+            card: cards
+          })
+          .from(deckCards)
+          .innerJoin(cards, eq(deckCards.cardId, cards.id))
+          .where(and(
+            eq(deckCards.deckId, input.deckId),
+            isNull(deckCards.deletedAt)
+          ))
+      );
+
+      if (cardsError) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch deck cards for analysis',
+        });
+      }
 
       // Calculate mana curve (CMC distribution)
       const manaCurve = deckCardsList

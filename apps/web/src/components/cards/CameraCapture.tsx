@@ -36,6 +36,7 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [selectedCamera, setSelectedCamera] = useState<string>('')
+  const [isVideoReady, setIsVideoReady] = useState<boolean>(false)
 
   // Log state changes
   useEffect(() => {
@@ -94,6 +95,7 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
+    setIsVideoReady(false)
   }, [])
 
   const startCamera = useCallback(async (deviceId?: string) => {
@@ -274,20 +276,38 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
         console.log('[CameraCapture] Applying stream to video element')
         console.log('[CameraCapture] Video element ready state:', videoRef.current.readyState)
 
-        videoRef.current.srcObject = streamRef.current
+        const video = videoRef.current
+        video.srcObject = streamRef.current
+
+        // Add loadedmetadata event listener to track when video dimensions are ready
+        const handleLoadedMetadata = () => {
+          console.log('[CameraCapture] Video metadata loaded:', {
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            readyState: video.readyState,
+          })
+          setIsVideoReady(video.videoWidth > 0 && video.videoHeight > 0)
+        }
+
+        video.addEventListener('loadedmetadata', handleLoadedMetadata)
 
         try {
           console.log('[CameraCapture] Attempting to play video...')
-          await videoRef.current.play()
+          await video.play()
           console.log('[CameraCapture] Video playback started successfully', {
-            videoWidth: videoRef.current.videoWidth,
-            videoHeight: videoRef.current.videoHeight,
-            readyState: videoRef.current.readyState,
+            videoWidth: video.videoWidth,
+            videoHeight: video.videoHeight,
+            readyState: video.readyState,
           })
         } catch (error) {
           console.error('[CameraCapture] Video playback error:', error)
           setState('error')
           setErrorMessage('Failed to start video playback. Please try again.')
+        }
+
+        // Cleanup event listener
+        return () => {
+          video.removeEventListener('loadedmetadata', handleLoadedMetadata)
         }
       }
     }
@@ -389,9 +409,13 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
-                <Button onClick={captureImage} className="flex-1 max-w-xs">
+                <Button
+                  onClick={captureImage}
+                  className="flex-1 max-w-xs"
+                  disabled={!isVideoReady}
+                >
                   <Camera className="w-4 h-4 mr-2" />
-                  Capture
+                  {isVideoReady ? 'Capture' : 'Loading...'}
                 </Button>
               </>
             )}
