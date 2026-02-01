@@ -1,0 +1,22 @@
+{
+  "version": "0.1.17",
+  "installed_at": "2026-02-01T18:38:05Z",
+  "project_type": "typescript",
+  "install_mode": "symlink",
+  "agentic_global_path": "/home/mantis/.agents/agentic-config",
+  "auto_check": true,
+  "symlinks": [
+    "agents",
+    ".agent/workflows/spec.md",
+    ".claude/commands/spec.md",
+    ".claude/commands/agentic*.md",
+    ".claude/agents/agentic-*.md",
+    ".gemini/commands/spec.toml",
+    ".gemini/commands/spec",
+    ".codex/prompts/spec.md"
+  ],
+  "copied": [
+    ".agent/config.yml",
+    "AGENTS.md"
+  ]
+}

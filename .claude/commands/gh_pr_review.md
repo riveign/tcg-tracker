@@ -1,0 +1,1 @@
+/home/mantis/.agents/agentic-config/core/commands/claude/gh_pr_review.md

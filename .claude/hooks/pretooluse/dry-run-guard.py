@@ -1,0 +1,1 @@
+/home/mantis/.agents/agentic-config/core/hooks/pretooluse/dry-run-guard.py

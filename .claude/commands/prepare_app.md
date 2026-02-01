@@ -1,0 +1,1 @@
+/home/mantis/.agents/agentic-config/core/commands/claude/prepare_app.md

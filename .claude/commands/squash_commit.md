@@ -1,0 +1,1 @@
+/home/mantis/.agents/agentic-config/core/commands/claude/squash_commit.md
