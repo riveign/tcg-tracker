@@ -22,6 +22,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ const deckFormSchema = z.object({
   name: z.string().min(1, 'Deck name is required').max(255),
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
+  collectionOnly: z.boolean().default(false),
 })
 
 type DeckFormValues = z.infer<typeof deckFormSchema>
@@ -68,6 +70,7 @@ export const DeckDialog = ({
       name: '',
       description: '',
       format: undefined,
+      collectionOnly: false,
     },
   })
 
@@ -78,12 +81,14 @@ export const DeckDialog = ({
         name: deck.name,
         description: deck.description || '',
         format: deck.format as any || undefined,
+        collectionOnly: deck.collectionOnly || false,
       })
     } else if (!isEditing) {
       form.reset({
         name: '',
         description: '',
         format: undefined,
+        collectionOnly: false,
       })
     }
   }, [deck, isEditing, form])
@@ -198,6 +203,28 @@ export const DeckDialog = ({
                     The Magic format this deck is built for
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="collectionOnly"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <FormLabel>Collection Cards Only</FormLabel>
+                    <FormDescription className="text-xs">
+                      Only allow cards from your collections in this deck
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

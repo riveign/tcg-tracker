@@ -1,20 +1,22 @@
 import { z } from 'zod';
 import { publicProcedure, protectedProcedure, router } from '../lib/trpc.js';
-import { db, decks, deckCards, cards } from '@tcg-tracker/db';
+import { db, decks, deckCards, cards, collections, collectionCards } from '@tcg-tracker/db';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 
 // Input schemas
 const createDeckSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional()
+  format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
+  collectionOnly: z.boolean().default(false)
 });
 
 const updateDeckSchema = z.object({
   deckId: z.string().uuid(),
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional()
+  format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
+  collectionOnly: z.boolean().optional()
 });
 
 const addCardToDeckSchema = z.object({
@@ -96,6 +98,7 @@ export const decksRouter = router({
         name: input.name,
         description: input.description,
         format: input.format,
+        collectionOnly: input.collectionOnly,
         ownerId: ctx.user.userId
       }).returning();
 
@@ -163,6 +166,25 @@ export const decksRouter = router({
 
       if (!deck) {
         throw new Error('Deck not found');
+      }
+
+      // If deck is collection-only, verify card exists in user's collections
+      if (deck.collectionOnly) {
+        const cardInCollection = await db
+          .select({ id: collectionCards.id })
+          .from(collectionCards)
+          .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
+          .where(and(
+            eq(collectionCards.cardId, input.cardId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collectionCards.deletedAt),
+            isNull(collections.deletedAt)
+          ))
+          .limit(1);
+
+        if (cardInCollection.length === 0) {
+          throw new Error('This deck only allows cards from your collections. Add this card to a collection first.');
+        }
       }
 
       // Add or update card in deck

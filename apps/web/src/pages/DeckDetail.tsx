@@ -214,6 +214,7 @@ export function DeckDetail() {
         onOpenChange={setIsSearchOpen}
         deckId={id}
         cardType={activeTab}
+        collectionOnly={deck.collectionOnly}
       />
 
       {/* Edit Deck Dialog */}

@@ -30,6 +30,7 @@ interface CardSearchDialogProps {
   collectionId?: string
   deckId?: string
   cardType?: 'mainboard' | 'sideboard' | 'commander'
+  collectionOnly?: boolean
 }
 
 export const CardSearchDialog = ({
@@ -38,6 +39,7 @@ export const CardSearchDialog = ({
   collectionId,
   deckId,
   cardType = 'mainboard',
+  collectionOnly = false,
 }: CardSearchDialogProps) => {
   const [selectedCard, setSelectedCard] = useState<ScryfallCard | null>(null)
   const [quantity, setQuantity] = useState(1)
@@ -112,7 +114,18 @@ export const CardSearchDialog = ({
             {isDeckMode ? `Add Cards to ${cardType === 'commander' ? 'Commander' : cardType === 'sideboard' ? 'Sideboard' : 'Mainboard'}` : 'Add Cards to Collection'}
           </DialogTitle>
           <DialogDescription>
-            {isDeckMode ? `Search for cards and add them to your deck's ${cardType}` : 'Search for cards and add them to your collection'}
+            {isDeckMode ? (
+              <>
+                {`Search for cards and add them to your deck's ${cardType}`}
+                {collectionOnly && (
+                  <span className="block mt-1 text-accent-cyan font-medium">
+                    ⓘ This deck only allows cards from your collections
+                  </span>
+                )}
+              </>
+            ) : (
+              'Search for cards and add them to your collection'
+            )}
           </DialogDescription>
         </DialogHeader>
 
