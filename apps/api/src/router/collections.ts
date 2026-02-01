@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../lib/trpc.js';
 import { db, collections, collectionCards, cards } from '@tcg-tracker/db';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql, or, ilike } from 'drizzle-orm';
 import { getCardById, transformScryfallCard } from '../lib/scryfall.js';
 
 const createCollectionSchema = z.object({
@@ -46,6 +46,11 @@ const updateCardQuantitySchema = z.object({
 const removeCardSchema = z.object({
   collectionId: z.string().uuid('Invalid collection ID'),
   cardId: z.string().uuid('Invalid card ID'),
+});
+
+const searchCollectionCardsSchema = z.object({
+  collectionId: z.string().uuid('Invalid collection ID').optional().nullable(),
+  query: z.string().min(1, 'Search query is required'),
 });
 
 export const collectionsRouter = router({
@@ -502,5 +507,87 @@ export const collectionsRouter = router({
         .where(eq(collectionCards.id, collectionCard.id));
 
       return { success: true };
+    }),
+
+  /**
+   * Search cards within a specific collection or all user collections
+   */
+  searchCards: protectedProcedure
+    .input(searchCollectionCardsSchema)
+    .query(async ({ input, ctx }) => {
+      const { collectionId, query } = input;
+
+      // Build the where clause for collection filtering
+      const collectionFilter = collectionId
+        ? and(
+            eq(collectionCards.collectionId, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collectionCards.deletedAt),
+            isNull(collections.deletedAt)
+          )
+        : and(
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collectionCards.deletedAt),
+            isNull(collections.deletedAt)
+          );
+
+      // If specific collection, verify ownership
+      if (collectionId) {
+        const collection = await db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          ),
+        });
+
+        if (!collection) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Collection not found or you do not have permission to view it',
+          });
+        }
+      }
+
+      // Search for cards in the collection(s) by name
+      const searchResults = await db
+        .select({
+          id: cards.id,
+          name: cards.name,
+          typeLine: cards.typeLine,
+          manaCost: cards.manaCost,
+          setCode: cards.setCode,
+          setName: cards.setName,
+          collectorNumber: cards.collectorNumber,
+          rarity: cards.rarity,
+          imageUris: cards.imageUris,
+          quantity: collectionCards.quantity,
+          collectionId: collectionCards.collectionId,
+        })
+        .from(collectionCards)
+        .innerJoin(cards, eq(collectionCards.cardId, cards.id))
+        .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
+        .where(
+          and(
+            collectionFilter,
+            ilike(cards.name, `%${query}%`)
+          )
+        )
+        .limit(50);
+
+      // Transform results to match Scryfall card format expected by frontend
+      return searchResults.map((result) => ({
+        id: result.id,
+        name: result.name,
+        type_line: result.typeLine,
+        mana_cost: result.manaCost,
+        set: result.setCode,
+        set_name: result.setName,
+        collector_number: result.collectorNumber,
+        rarity: result.rarity,
+        image_uris: result.imageUris as any,
+        quantity: result.quantity,
+        collectionId: result.collectionId,
+      }));
     }),
 });

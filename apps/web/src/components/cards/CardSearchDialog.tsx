@@ -31,6 +31,7 @@ interface CardSearchDialogProps {
   deckId?: string
   cardType?: 'mainboard' | 'sideboard' | 'commander'
   collectionOnly?: boolean
+  deckCollectionId?: string | null
 }
 
 export const CardSearchDialog = ({
@@ -40,6 +41,7 @@ export const CardSearchDialog = ({
   deckId,
   cardType = 'mainboard',
   collectionOnly = false,
+  deckCollectionId,
 }: CardSearchDialogProps) => {
   const [selectedCard, setSelectedCard] = useState<ScryfallCard | null>(null)
   const [quantity, setQuantity] = useState(1)
@@ -50,6 +52,14 @@ export const CardSearchDialog = ({
   const addCardToDeckMutation = trpc.decks.addCard.useMutation()
 
   const isDeckMode = !!deckId
+  // Use collection search if:
+  // - We're in collection mode (!!collectionId), OR
+  // - Deck is in collectionOnly mode, OR
+  // - Deck has a collection linked (even if not in collectionOnly mode)
+  const useCollectionSearch = !!collectionId || collectionOnly || (isDeckMode && deckCollectionId != null)
+  // When in deck mode, use the deck's collectionId (can be null for all collections)
+  // When in collection mode, use the specific collectionId
+  const searchCollectionId = isDeckMode ? deckCollectionId : collectionId
 
   const handleCardSelect = (card: ScryfallCard) => {
     setSelectedCard(card)
@@ -134,7 +144,9 @@ export const CardSearchDialog = ({
           {!selectedCard && (
             <CardSearch
               onCardSelect={handleCardSelect}
-              placeholder="Search for a card by name..."
+              placeholder={useCollectionSearch ? "Search cards in your collection..." : "Search for a card by name..."}
+              useCollectionSearch={useCollectionSearch}
+              collectionId={searchCollectionId}
             />
           )}
 

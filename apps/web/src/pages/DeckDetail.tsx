@@ -28,7 +28,8 @@ export function DeckDetail() {
   );
 
   const deleteDeckMutation = trpc.decks.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      await utils.decks.list.invalidate();
       navigate('/decks');
     }
   });
@@ -215,6 +216,7 @@ export function DeckDetail() {
         deckId={id}
         cardType={activeTab}
         collectionOnly={deck.collectionOnly}
+        deckCollectionId={deck.collectionId}
       />
 
       {/* Edit Deck Dialog */}

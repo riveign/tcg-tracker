@@ -37,6 +37,7 @@ const deckFormSchema = z.object({
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
   collectionOnly: z.boolean().default(false),
+  collectionId: z.string().uuid().optional().nullable(),
 })
 
 type DeckFormValues = z.infer<typeof deckFormSchema>
@@ -61,6 +62,8 @@ export const DeckDialog = ({
     { enabled: isEditing && Boolean(deckId) }
   )
 
+  const { data: collections = [] } = trpc.collections.list.useQuery()
+
   const createMutation = trpc.decks.create.useMutation()
   const updateMutation = trpc.decks.update.useMutation()
 
@@ -71,6 +74,7 @@ export const DeckDialog = ({
       description: '',
       format: undefined,
       collectionOnly: false,
+      collectionId: null,
     },
   })
 
@@ -82,6 +86,7 @@ export const DeckDialog = ({
         description: deck.description || '',
         format: deck.format as any || undefined,
         collectionOnly: deck.collectionOnly || false,
+        collectionId: deck.collectionId || null,
       })
     } else if (!isEditing) {
       form.reset({
@@ -89,6 +94,7 @@ export const DeckDialog = ({
         description: '',
         format: undefined,
         collectionOnly: false,
+        collectionId: null,
       })
     }
   }, [deck, isEditing, form])
@@ -201,6 +207,39 @@ export const DeckDialog = ({
                   </Select>
                   <FormDescription className="text-xs">
                     The Magic format this deck is built for
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="collectionId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Collection (optional)</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                    value={field.value || 'none'}
+                    disabled={isSubmitting}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a collection" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">All Collections (Aggregate)</SelectItem>
+                      {collections.map((collection) => (
+                        <SelectItem key={collection.id} value={collection.id}>
+                          {collection.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="text-xs">
+                    Link deck to a specific collection or use all collections
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

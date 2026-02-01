@@ -23,16 +23,39 @@ interface ScryfallCard {
 interface CardSearchProps {
   onCardSelect: (card: ScryfallCard) => void
   placeholder?: string
+  useCollectionSearch?: boolean
+  collectionId?: string | null
 }
 
-export const CardSearch = ({ onCardSelect, placeholder = 'Search for a card...' }: CardSearchProps) => {
+export const CardSearch = ({
+  onCardSelect,
+  placeholder = 'Search for a card...',
+  useCollectionSearch = false,
+  collectionId
+}: CardSearchProps) => {
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearch = useDebounce(searchQuery, 500)
 
-  const { data, isLoading, error } = trpc.cards.search.useQuery(
-    { query: debouncedSearch, page: 1 },
-    { enabled: debouncedSearch.length > 0 }
+  // Use collection search if requested
+  const { data: collectionData, isLoading: isCollectionLoading, error: collectionError } = trpc.collections.searchCards.useQuery(
+    { query: debouncedSearch, collectionId: collectionId || null },
+    { enabled: useCollectionSearch && debouncedSearch.length > 0 }
   )
+
+  // Use regular Scryfall search otherwise
+  const { data: scryfallData, isLoading: isScryfallLoading, error: scryfallError } = trpc.cards.search.useQuery(
+    { query: debouncedSearch, page: 1 },
+    { enabled: !useCollectionSearch && debouncedSearch.length > 0 }
+  )
+
+  // Select the appropriate data based on search mode
+  const data = useCollectionSearch
+    ? collectionData
+      ? { cards: collectionData, hasMore: false, total: collectionData.length }
+      : undefined
+    : scryfallData
+  const isLoading = useCollectionSearch ? isCollectionLoading : isScryfallLoading
+  const error = useCollectionSearch ? collectionError : scryfallError
 
   const handleCardClick = useCallback(
     (card: ScryfallCard) => {

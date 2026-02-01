@@ -8,7 +8,8 @@ const createDeckSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
-  collectionOnly: z.boolean().default(false)
+  collectionOnly: z.boolean().default(false),
+  collectionId: z.string().uuid().optional().nullable()
 });
 
 const updateDeckSchema = z.object({
@@ -16,7 +17,8 @@ const updateDeckSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
-  collectionOnly: z.boolean().optional()
+  collectionOnly: z.boolean().optional(),
+  collectionId: z.string().uuid().optional().nullable()
 });
 
 const addCardToDeckSchema = z.object({
@@ -94,11 +96,27 @@ export const decksRouter = router({
   create: protectedProcedure
     .input(createDeckSchema)
     .mutation(async ({ ctx, input }) => {
+      // Validate collection ownership if collectionId is provided
+      if (input.collectionId) {
+        const collection = await db.query.collections.findFirst({
+          where: and(
+            eq(collections.id, input.collectionId),
+            eq(collections.ownerId, ctx.user.userId),
+            isNull(collections.deletedAt)
+          )
+        });
+
+        if (!collection) {
+          throw new Error('Collection not found or you do not have access to it');
+        }
+      }
+
       const [newDeck] = await db.insert(decks).values({
         name: input.name,
         description: input.description,
         format: input.format,
         collectionOnly: input.collectionOnly,
+        collectionId: input.collectionId,
         ownerId: ctx.user.userId
       }).returning();
 
@@ -168,9 +186,9 @@ export const decksRouter = router({
         throw new Error('Deck not found');
       }
 
-      // If deck is collection-only, verify card exists in user's collections
+      // If deck is collection-only, verify card exists in the specified collection(s)
       if (deck.collectionOnly) {
-        const cardInCollection = await db
+        const cardInCollectionQuery = db
           .select({ id: collectionCards.id })
           .from(collectionCards)
           .innerJoin(collections, eq(collectionCards.collectionId, collections.id))
@@ -178,12 +196,20 @@ export const decksRouter = router({
             eq(collectionCards.cardId, input.cardId),
             eq(collections.ownerId, ctx.user.userId),
             isNull(collectionCards.deletedAt),
-            isNull(collections.deletedAt)
+            isNull(collections.deletedAt),
+            // If deck has a specific collectionId, only check that collection
+            deck.collectionId ? eq(collections.id, deck.collectionId) : sql`true`
           ))
           .limit(1);
 
+        const cardInCollection = await cardInCollectionQuery;
+
         if (cardInCollection.length === 0) {
-          throw new Error('This deck only allows cards from your collections. Add this card to a collection first.');
+          if (deck.collectionId) {
+            throw new Error('This deck only allows cards from the linked collection. Add this card to the collection first.');
+          } else {
+            throw new Error('This deck only allows cards from your collections. Add this card to a collection first.');
+          }
         }
       }
 
