@@ -55,18 +55,7 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
 
       console.log('[CameraCapture] Stream acquired:', stream.id)
       streamRef.current = stream
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        console.log('[CameraCapture] Starting video playback...')
-        await videoRef.current.play()
-        console.log('[CameraCapture] Video playing, setting state to streaming')
-        setState('streaming')
-      } else {
-        console.error('[CameraCapture] videoRef.current is null')
-        setState('error')
-        setErrorMessage('Video element not ready. Please try again.')
-      }
+      setState('streaming')
     } catch (error) {
       console.error('[CameraCapture] Camera error:', error)
       setState('error')
@@ -150,6 +139,25 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, state])
+
+  useEffect(() => {
+    const applyStream = async () => {
+      if (state === 'streaming' && videoRef.current && streamRef.current) {
+        console.log('[CameraCapture] Applying stream to video element')
+        videoRef.current.srcObject = streamRef.current
+        try {
+          await videoRef.current.play()
+          console.log('[CameraCapture] Video playback started')
+        } catch (error) {
+          console.error('[CameraCapture] Video playback error:', error)
+          setState('error')
+          setErrorMessage('Failed to start video playback. Please try again.')
+        }
+      }
+    }
+
+    applyStream()
+  }, [state])
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
