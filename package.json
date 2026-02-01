@@ -1,0 +1,24 @@
+{
+  "name": "tcg-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:web": "bun run --filter @tcg-tracker/web dev",
+    "dev:api": "bun run --filter @tcg-tracker/api dev",
+    "build": "bun run --filter '*' build",
+    "lint": "bun run --filter '*' lint",
+    "type-check": "bun run --filter '*' type-check",
+    "db:studio": "bun run --filter @tcg-tracker/db db:studio",
+    "db:push": "bun run --filter @tcg-tracker/db db:push",
+    "db:generate": "bun run --filter @tcg-tracker/db db:generate"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
+  }
+}
