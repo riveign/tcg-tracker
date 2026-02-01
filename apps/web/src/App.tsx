@@ -8,9 +8,12 @@ import { Shell } from '@/components/layout/Shell'
 
 // Pages
 import { Collections } from '@/pages/Collections'
+import { CollectionDetail } from '@/pages/CollectionDetail'
+import { Search } from '@/pages/Search'
 import { Scan } from '@/pages/Scan'
 import { Complete } from '@/pages/Complete'
 import { Build } from '@/pages/Build'
+import { Decks } from '@/pages/Decks'
 import { Login } from '@/pages/Login'
 import { Signup } from '@/pages/Signup'
 
@@ -68,8 +71,11 @@ function AppRoutes() {
       >
         <Route index element={<Navigate to="/collections" replace />} />
         <Route path="collections" element={<Collections />} />
+        <Route path="collections/:id" element={<CollectionDetail />} />
+        <Route path="search" element={<Search />} />
         <Route path="scan" element={<Scan />} />
         <Route path="complete" element={<Complete />} />
+        <Route path="decks" element={<Decks />} />
         <Route path="build" element={<Build />} />
       </Route>
 

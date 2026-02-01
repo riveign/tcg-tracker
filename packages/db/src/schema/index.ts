@@ -4,3 +4,5 @@ export * from "./cards";
 export * from "./collections";
 export * from "./collection-members";
 export * from "./collection-cards";
+export * from "./decks";
+export * from "./deck-cards";

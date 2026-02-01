@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Library, ScanLine, List, Layers } from 'lucide-react'
+import { Library, Search, List, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -9,9 +9,9 @@ const navItems = [
     path: '/collections',
   },
   {
-    label: 'Scan',
-    icon: ScanLine,
-    path: '/scan',
+    label: 'Search',
+    icon: Search,
+    path: '/search',
   },
   {
     label: 'Complete',
@@ -19,9 +19,9 @@ const navItems = [
     path: '/complete',
   },
   {
-    label: 'Build',
+    label: 'Decks',
     icon: Layers,
-    path: '/build',
+    path: '/decks',
   },
 ]
 

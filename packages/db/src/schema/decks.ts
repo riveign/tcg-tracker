@@ -1,0 +1,13 @@
+import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core';
+import { users } from './users';
+
+export const decks = pgTable('decks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  format: varchar('format', { length: 50 }),
+  ownerId: uuid('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true })
+});
