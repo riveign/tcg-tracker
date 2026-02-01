@@ -82,6 +82,13 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
     const video = videoRef.current
     const canvas = canvasRef.current
 
+    // Ensure video has valid dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      setErrorMessage('Video stream not ready. Please try again.')
+      setState('error')
+      return
+    }
+
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
 
@@ -94,7 +101,8 @@ export const CameraCapture = ({ onCapture, onClose, isOpen = true }: CameraCaptu
 
     context.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    const imageData = canvas.toDataURL('image/jpeg', 0.9)
+    // Use PNG format for better compatibility with Tesseract
+    const imageData = canvas.toDataURL('image/png')
     setCapturedImage(imageData)
     setState('captured')
     stopCamera()

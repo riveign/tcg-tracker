@@ -37,10 +37,21 @@ export const Scan = () => {
     setRecognizedCards([])
 
     try {
-      // Convert base64 to blob
+      // Validate base64 data URL format
+      if (!imageData.startsWith('data:image/')) {
+        throw new Error('Invalid image data format')
+      }
+
+      // Convert base64 data URL to blob
       const response = await fetch(imageData)
       const blob = await response.blob()
-      const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' })
+
+      // Validate blob has content
+      if (blob.size === 0) {
+        throw new Error('Captured image is empty')
+      }
+
+      const file = new File([blob], 'camera-capture.png', { type: 'image/png' })
 
       // Run OCR recognition
       const result = await recognizeCard(file)

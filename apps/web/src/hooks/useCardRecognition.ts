@@ -113,6 +113,16 @@ export function useCardRecognition() {
       setProgress(0)
 
       try {
+        // Validate input
+        if (imageFile instanceof File) {
+          if (imageFile.size === 0) {
+            throw new Error('Image file is empty')
+          }
+          if (!imageFile.type.startsWith('image/')) {
+            throw new Error('Invalid file type. Expected an image file.')
+          }
+        }
+
         // Initialize Tesseract worker
         const worker = await createWorker('eng', 1, {
           logger: (m) => {
