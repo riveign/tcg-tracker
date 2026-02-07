@@ -9,6 +9,8 @@
 import type { FormatAdapter, FormatType } from './types.js';
 import { StandardAdapter } from './standard.js';
 import { CommanderAdapter } from './commander.js';
+import { ModernAdapter } from './modern.js';
+import { BrawlAdapter } from './brawl.js';
 
 // =============================================================================
 // Adapter Cache
@@ -86,19 +88,13 @@ export class FormatAdapterFactory {
         return new StandardAdapter();
 
       case 'modern':
-        // Modern uses similar rules to Standard but with different legality
-        // For Phase 1, we reuse StandardAdapter with a note for Phase 2 implementation
-        // TODO: Implement dedicated ModernAdapter in Phase 2
-        return new StandardAdapter();
+        return new ModernAdapter();
 
       case 'commander':
         return new CommanderAdapter();
 
       case 'brawl':
-        // Brawl is similar to Commander but with Standard legality
-        // For Phase 1, we use CommanderAdapter with a note for Phase 2 implementation
-        // TODO: Implement dedicated BrawlAdapter in Phase 2
-        return new CommanderAdapter();
+        return new BrawlAdapter();
 
       default: {
         // Exhaustive check - this should never happen if FormatType is properly defined
