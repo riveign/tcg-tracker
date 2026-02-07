@@ -33,7 +33,7 @@ Successfully completed comprehensive research and planning for an intelligent MT
 ## Deliverables
 
 ### 1. MTG Deckbuilding Research
-**Location**: `outputs/orc/2026/02/07/122148-4f3cc411/mtg-deckbuilding-research/summary.md`
+**Location**: `01-research/mtg-deckbuilding-theory.md`
 
 **Key Findings**:
 - **Mana Curve**: Foundation of all deckbuilding; Commander decks typically use 36-38 lands
@@ -46,7 +46,7 @@ Successfully completed comprehensive research and planning for an intelligent MT
 **Sources**: EDHREC, MTG Goldfish, Channel Fireball, TCGPlayer, MTG Wiki
 
 ### 2. Codebase Analysis
-**Location**: `outputs/orc/2026/02/07/122148-4f3cc411/codebase-analysis/summary.md`
+**Location**: `01-research/codebase-analysis.md`
 
 **Technical Inventory**:
 - **Database**: PostgreSQL with comprehensive card schema (types, subtypes, keywords, colors, stats)
@@ -63,7 +63,7 @@ Successfully completed comprehensive research and planning for an intelligent MT
 - Authentication and authorization in place
 
 ### 3. Product Scope Document
-**Location**: `outputs/orc/2026/02/07/122148-4f3cc411/product-scope/summary.md`
+**Location**: `02-product/product-scope.md`
 
 **Product Vision**:
 > Help Commander players build better decks faster by providing intelligent, collection-aware card recommendations based on their commander choice and evolving deck composition.
@@ -101,7 +101,7 @@ Successfully completed comprehensive research and planning for an intelligent MT
 - Mobile-specific optimizations
 
 ### 4. Technical Design Document
-**Location**: `outputs/orc/2026/02/07/122148-4f3cc411/technical-design/summary.md`
+**Location**: `03-technical/technical-design.md`
 
 **System Architecture**:
 ```
@@ -245,16 +245,16 @@ apps/api/src/
 
 ```
 outputs/orc/2026/02/07/122148-4f3cc411/
-├── 0_orchestrator_summary.md                    # This file
-├── workflow_state.yml                           # Session state tracking
-├── mtg-deckbuilding-research/
-│   └── summary.md                               # MTG theory research (500+ lines)
-├── codebase-analysis/
-│   └── summary.md                               # Database/API analysis
-├── product-scope/
-│   └── summary.md                               # Product vision & features
-└── technical-design/
-    └── summary.md                               # Algorithm & architecture design
+├── 00-session/
+│   ├── orchestrator-summary.md                  # This file
+│   └── workflow-state.yml                       # Session state tracking
+├── 01-research/
+│   ├── mtg-deckbuilding-theory.md              # MTG theory research (500+ lines)
+│   └── codebase-analysis.md                     # Database/API analysis
+├── 02-product/
+│   └── product-scope.md                         # Product vision & features
+└── 03-technical/
+    └── technical-design.md                      # Algorithm & architecture design
 ```
 
 ---

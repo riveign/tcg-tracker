@@ -13,31 +13,31 @@ steps:
     status: "completed"
     started_at: "2026-02-07T12:21:48Z"
     completed_at: "2026-02-07T12:23:30Z"
-    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/mtg-deckbuilding-research/summary.md"
+    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/01-research/mtg-deckbuilding-theory.md"
   - step: 2
     name: "Analyze Codebase Structure"
     status: "completed"
     started_at: "2026-02-07T12:23:35Z"
     completed_at: "2026-02-07T12:25:00Z"
-    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/codebase-analysis/summary.md"
+    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/01-research/codebase-analysis.md"
   - step: 3
     name: "Create Product Scope Document"
     status: "completed"
     started_at: "2026-02-07T12:25:05Z"
     completed_at: "2026-02-07T12:27:30Z"
-    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/product-scope/summary.md"
+    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/02-product/product-scope.md"
   - step: 4
     name: "Design Technical Architecture"
     status: "completed"
     started_at: "2026-02-07T12:27:35Z"
     completed_at: "2026-02-07T12:30:00Z"
-    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/technical-design/summary.md"
+    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/03-technical/technical-design.md"
   - step: 5
     name: "Generate Orchestrator Summary"
     status: "completed"
     started_at: "2026-02-07T12:30:00Z"
     completed_at: "2026-02-07T12:30:15Z"
-    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/0_orchestrator_summary.md"
+    summary_path: "outputs/orc/2026/02/07/122148-4f3cc411/00-session/orchestrator-summary.md"
 
 error_context: null
 resume_instruction: null
