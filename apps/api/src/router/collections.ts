@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../lib/trpc.js';
 import { db, collections, collectionCards, cards } from '@tcg-tracker/db';
 import { eq, and, isNull, sql, ilike } from 'drizzle-orm';
-import { getCardById, transformScryfallCard } from '../lib/scryfall.js';
+import { getCardById, transformScryfallCard, parseSetCodeQuery } from '../lib/scryfall.js';
 import { handlePromise } from '../lib/utils.js';
 
 const createCollectionSchema = z.object({
@@ -760,7 +760,18 @@ export const collectionsRouter = router({
         }
       }
 
-      // Search for cards in the collection(s) by name
+      // Check if query matches set code pattern (e.g., "ECL #212", "ECL 212", "ecl#212", "ECL-212")
+      const setCodeMatch = parseSetCodeQuery(query);
+
+      // Build the search condition based on query type
+      const searchCondition = setCodeMatch
+        ? and(
+            eq(cards.setCode, setCodeMatch.setCode),
+            eq(cards.collectorNumber, setCodeMatch.collectorNumber)
+          )
+        : ilike(cards.name, `%${query}%`);
+
+      // Search for cards in the collection(s) by name or set code
       const { data: searchResults, error: searchError } = await handlePromise(
         db
           .select({
@@ -782,7 +793,7 @@ export const collectionsRouter = router({
           .where(
             and(
               collectionFilter,
-              ilike(cards.name, `%${query}%`)
+              searchCondition
             )
           )
           .limit(50)

@@ -75,7 +75,7 @@ See [QUICK_START.md](./QUICK_START.md) for full setup and testing instructions.
 
 ## 📋 Project Status
 
-**Current Phase**: Core Features Complete ✅
+**Current Phase**: Deck Recommendation System (Phase 4) 🚧
 
 **Completed:**
 - ✅ Monorepo structure with Turborepo
@@ -90,11 +90,19 @@ See [QUICK_START.md](./QUICK_START.md) for full setup and testing instructions.
 - ✅ Complete collection view (aggregated across all collections)
 - ✅ Advanced filtering (colors, types, keywords, rarity, CMC)
 - ✅ Collection search (within individual or complete collections)
+- ✅ MTG Deck Recommendation System backend (Phase 1-3)
+- ✅ React Query hooks for recommendation API (Phase 4.1)
+
+**In Progress (Phase 4 - Frontend Integration):**
+- ✅ Hooks foundation with 6 API endpoints
+- ⏳ Card suggestions UI component
+- ⏳ Buildable decks explorer
+- ⏳ Format coverage dashboard
 
 **Next Steps:**
-1. Implement Deck Builder (full plan in HANDOVER.md)
-2. Add mana curve visualization
-3. Deck statistics and validation
+1. Complete Phase 4 frontend components
+2. Add mana curve visualization to deck builder
+3. Implement deck statistics and validation
 
 See [HANDOVER.md](./HANDOVER.md) for complete implementation details and next steps.
 
@@ -120,6 +128,7 @@ tcg-tracker/
 │   │   │   │   └── ui/           # shadcn/ui components
 │   │   │   ├── pages/            # Route pages
 │   │   │   ├── hooks/            # Custom React hooks
+│   │   │   │   └── useRecommendations.ts # Recommendation system hooks
 │   │   │   └── lib/              # Utilities (tRPC client)
 │   │   └── package.json
 │   └── api/                      # Backend (Hono + tRPC)
@@ -128,8 +137,10 @@ tcg-tracker/
 │       │   │   ├── auth.ts       # Authentication
 │       │   │   ├── cards.ts      # Card search
 │       │   │   ├── collections.ts # Collection management
-│       │   │   └── complete.ts   # Aggregated view
+│       │   │   ├── complete.ts   # Aggregated view
+│       │   │   └── recommendations.ts # MTG deck recommendations
 │       │   └── lib/              # Scryfall API integration
+│       │       └── recommendation/ # Recommendation system
 │       └── package.json
 ├── packages/
 │   └── db/                       # Database (Drizzle ORM)
@@ -172,9 +183,26 @@ tcg-tracker/
 - ✅ Mana cost, power/toughness, oracle text
 - ✅ Flavor text and artist information
 
+**Deck Recommendation System (Backend):**
+- ✅ Multi-format card suggestions (Standard, Modern, Commander, Brawl)
+- ✅ Buildable deck discovery from collection
+- ✅ Format coverage analysis
+- ✅ Multi-format deck comparison
+- ✅ Archetype detection
+- ✅ Gap analysis with category breakdown
+- ✅ React Query hooks for all recommendation endpoints
+
 ## 🚧 Planned Features
 
-**Next Up:**
+**Next Up (Phase 4 - Frontend Integration):**
+- [ ] Card suggestions UI component with category filtering
+- [ ] Buildable decks explorer with format selection
+- [ ] Format coverage dashboard with viability indicators
+- [ ] Multi-format comparison view
+- [ ] Deck archetype display
+- [ ] Gap analysis UI with recommendation cards
+
+**Upcoming:**
 - [ ] Deck builder with mana curve visualization
 - [ ] Deck statistics and validation
 - [ ] Add cards from collection to deck

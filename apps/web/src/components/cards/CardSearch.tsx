@@ -68,18 +68,23 @@ export const CardSearch = ({
   return (
     <div className="space-y-3">
       {/* Search Input */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
-        <Input
-          type="text"
-          placeholder={placeholder}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-        />
-        {isLoading && (
-          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary animate-spin" />
-        )}
+      <div className="space-y-1">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <Input
+            type="text"
+            placeholder={placeholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+          {isLoading && (
+            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary animate-spin" />
+          )}
+        </div>
+        <p className="text-xs text-text-secondary">
+          Search by name or set code (e.g., "ECL #212", "ECL 212", "ECL-212")
+        </p>
       </div>
 
       {/* Results */}

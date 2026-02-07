@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { BottomNav } from './BottomNav'
+import { ProgressiveNotification } from '@/components/recommendations'
 
 export const Shell = () => {
   return (
@@ -11,6 +12,9 @@ export const Shell = () => {
 
       {/* Bottom navigation */}
       <BottomNav />
+
+      {/* Global progressive notifications */}
+      <ProgressiveNotification />
     </div>
   )
 }
