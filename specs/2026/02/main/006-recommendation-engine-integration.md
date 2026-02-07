@@ -1202,3 +1202,65 @@ EOF
 | L32: Legacy decks without metadata still get recommendations | Fallback logic in Tasks 3, 5, 7, 9 (L32) |
 | L33: Recommendations return within 2 seconds | No additional database queries; metadata loaded with deck (L33) |
 | L34: Type checking and lint pass | Task 13 runs lint and type-check (L34) |
+
+## Plan Review
+
+**Review Date**: 2026-02-07
+**Reviewer**: Claude Opus 4.5
+
+### Summary
+
+Plan validated with minor corrections. The implementation approach is sound, but several diff line numbers needed adjustment for accuracy.
+
+### Issues Found and Corrected
+
+1. **Task 4 (CommanderAdapter archetype modifiers)**: Line 159 reference was ambiguous. Clarified that new archetypes should be inserted BEFORE the `default` archetype entry at lines 159-163. The insertion point is after line 158 (end of `tokens` archetype).
+
+2. **Task 6 (StandardAdapter archetype modifiers)**: Similar issue - new archetypes should be inserted BEFORE the `default` archetype at lines 109-113. Insertion point is after line 108 (end of `combo` archetype).
+
+3. **Task 7 (ArchetypeDetector.getEffectiveArchetype)**: The diff showed insertion at line 224 which is within the `detect` method body. Corrected to insert the new static method AFTER the `matches()` method (after line 244), not within an existing method.
+
+4. **Task 8 (SynergyScorer strategy boosts)**: The diff structure was unclear about where the `effectiveArchetype` variable should be declared. Clarified that:
+   - Line 260 declares `effectiveArchetype` using context.deckStrategy or context.archetype
+   - Line 263 modifies the `getArchetypeModifiers` call to use `effectiveArchetype`
+   - Strategy-specific boosts are added BEFORE the return statement at line 320
+
+5. **Task 10 (Import ManaColor)**: Verified that `ManaColor` is already exported from `./lib/recommendation/index.js` (line 33). No additional export needed from types.ts.
+
+### Test Coverage Assessment
+
+- **Unit Tests (Task 14)**: Comprehensive coverage for:
+  - CommanderAdapter.getColorConstraint with deck.colors
+  - StandardAdapter.getColorPreference and matchesColorPreference
+  - ArchetypeDetector.getEffectiveArchetype
+  - SynergyScorer with deckStrategy context
+  - Legacy deck fallback behavior
+
+- **Missing Coverage**: Consider adding in future iterations:
+  - Integration test for full getSuggestions flow with metadata
+  - Performance regression test for <2 second requirement
+
+### Line Number Reference Table (Corrected)
+
+| File | Target Location | Actual Line |
+|------|-----------------|-------------|
+| types.ts - DeckWithCards | After `commander?: DeckCard;` | 134 |
+| types.ts - ScoringContext | After `adapter: FormatAdapter;` | 300 |
+| commander.ts - getColorConstraint | Start of method | 445 |
+| commander.ts - ARCHETYPE_MODIFIERS | After `tokens` entry | 158 |
+| standard.ts - getColorConstraint | Method definition | 328 |
+| standard.ts - ARCHETYPE_MODIFIERS | After `combo` entry | 108 |
+| archetype-detector.ts - new method | After `matches()` method | 244 |
+| synergy-scorer.ts - calculateStrategicSynergy | Within method body | 255-320 |
+| recommendations.ts - loadDeckWithCards | Before return statement | 171-178 |
+| recommendations.ts - detectArchetype | Start of function | 328 |
+
+### Verdict
+
+**Plan validated - corrections applied above.**
+
+The implementation is well-structured with appropriate separation of concerns:
+- Type extensions are minimal and backward-compatible
+- Fallback logic ensures legacy deck compatibility
+- Strategy-specific scoring enhances recommendations without breaking existing behavior
+- Test coverage is adequate for Phase 6 scope
