@@ -44,10 +44,26 @@ describe('CollectionCoverage', () => {
       data: {
         format: 'standard',
         totalLegalCards: 150,
-        viableArchetypes: ['aggro', 'control', 'midrange'],
+        viableArchetypes: [
+          { archetype: 'aggro', completeness: 85, keyCards: ['Lightning Bolt', 'Goblin Guide'] },
+          { archetype: 'control', completeness: 90, keyCards: ['Counterspell', 'Wrath of God'] },
+          { archetype: 'midrange', completeness: 75, keyCards: ['Tarmogoyf', 'Liliana'] },
+        ],
         buildableDecks: [
-          { name: 'Mono Red Aggro', completeness: 95 },
-          { name: 'Blue Control', completeness: 80 },
+          {
+            archetype: 'Mono Red Aggro',
+            completeness: 95,
+            coreCardsOwned: ['Lightning Bolt', 'Goblin Guide'],
+            missingCount: 2,
+            missingKeyCards: ['Eidolon of the Great Revel'],
+          },
+          {
+            archetype: 'Blue Control',
+            completeness: 80,
+            coreCardsOwned: ['Counterspell'],
+            missingCount: 5,
+            missingKeyCards: ['Jace, the Mind Sculptor'],
+          },
         ],
       },
       isLoading: false,
@@ -60,8 +76,8 @@ describe('CollectionCoverage', () => {
     expect(screen.getByText('150')).toBeInTheDocument();
     expect(screen.getByText('Viable Archetypes')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('aggro')).toBeInTheDocument();
-    expect(screen.getByText('control')).toBeInTheDocument();
+    expect(screen.getByText('aggro (85%)')).toBeInTheDocument();
+    expect(screen.getByText('control (90%)')).toBeInTheDocument();
     expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
     expect(screen.getByText('95%')).toBeInTheDocument();
   });
@@ -69,10 +85,30 @@ describe('CollectionCoverage', () => {
   it('renders multi-format coverage when no format specified', () => {
     mockUseFormatCoverage.mockReturnValue({
       data: {
-        standard: { format: 'standard', totalLegalCards: 100, viableArchetypes: ['aggro'], buildableDecks: [] },
-        modern: { format: 'modern', totalLegalCards: 200, viableArchetypes: ['combo'], buildableDecks: [] },
-        commander: { format: 'commander', totalLegalCards: 500, viableArchetypes: [], buildableDecks: [] },
-        brawl: { format: 'brawl', totalLegalCards: 80, viableArchetypes: [], buildableDecks: [] },
+        standard: {
+          format: 'standard',
+          totalLegalCards: 100,
+          viableArchetypes: [{ archetype: 'aggro', completeness: 80, keyCards: [] }],
+          buildableDecks: [],
+        },
+        modern: {
+          format: 'modern',
+          totalLegalCards: 200,
+          viableArchetypes: [{ archetype: 'combo', completeness: 70, keyCards: [] }],
+          buildableDecks: [],
+        },
+        commander: {
+          format: 'commander',
+          totalLegalCards: 500,
+          viableArchetypes: [],
+          buildableDecks: [],
+        },
+        brawl: {
+          format: 'brawl',
+          totalLegalCards: 80,
+          viableArchetypes: [],
+          buildableDecks: [],
+        },
       },
       isLoading: false,
       error: null,

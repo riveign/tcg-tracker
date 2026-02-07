@@ -17,16 +17,51 @@ export interface CollectionCoverageProps {
 }
 
 /**
+ * ViableArchetype structure from API
+ */
+export interface ViableArchetype {
+  archetype: string;
+  completeness: number;
+  keyCards: string[];
+}
+
+/**
+ * BuildableDeck structure from API
+ */
+export interface BuildableDeck {
+  archetype: string;
+  completeness: number;
+  coreCardsOwned: string[];
+  missingCount: number;
+  missingKeyCards: string[];
+}
+
+/**
+ * Single format coverage structure
+ */
+export interface SingleFormatCoverage {
+  format: FormatType;
+  totalLegalCards: number;
+  viableArchetypes: ViableArchetype[];
+  buildableDecks: BuildableDeck[];
+}
+
+/**
+ * Multi-format coverage structure
+ */
+export interface MultiFormatCoverage {
+  standard: SingleFormatCoverage;
+  modern: SingleFormatCoverage;
+  commander: SingleFormatCoverage;
+  brawl: SingleFormatCoverage;
+}
+
+/**
  * Type guard for single format coverage response
  */
 function isSingleFormatCoverage(
   data: FormatCoverageOutput
-): data is {
-  format: FormatType;
-  totalLegalCards: number;
-  viableArchetypes: string[];
-  buildableDecks: Array<{ name: string; completeness: number }>;
-} {
+): data is SingleFormatCoverage {
   return 'format' in data && typeof data.format === 'string';
 }
 
@@ -53,16 +88,7 @@ function CoverageProgressBar({ percentage, label }: { percentage: number; label:
 /**
  * Single format coverage display
  */
-function SingleFormatCoverage({
-  data,
-}: {
-  data: {
-    format: FormatType;
-    totalLegalCards: number;
-    viableArchetypes: string[];
-    buildableDecks: Array<{ name: string; completeness: number }>;
-  };
-}) {
+function SingleFormatCoverageDisplay({ data }: { data: SingleFormatCoverage }) {
   // Calculate coverage percentage based on viable archetypes
   const coveragePercentage = data.viableArchetypes.length > 0
     ? Math.min(100, Math.round((data.viableArchetypes.length / 5) * 100))
@@ -118,12 +144,12 @@ function SingleFormatCoverage({
               Viable Archetypes
             </div>
             <div className="flex flex-wrap gap-2">
-              {data.viableArchetypes.map((archetype) => (
+              {data.viableArchetypes.map((viable) => (
                 <span
-                  key={archetype}
+                  key={viable.archetype}
                   className="px-2 py-1 bg-accent-cyan/20 text-accent-cyan text-sm rounded-md"
                 >
-                  {archetype}
+                  {viable.archetype} ({viable.completeness}%)
                 </span>
               ))}
             </div>
@@ -140,9 +166,9 @@ function SingleFormatCoverage({
             </div>
             <div className="space-y-2">
               {data.buildableDecks.slice(0, 5).map((deck) => (
-                <div key={deck.name} className="flex items-center justify-between">
+                <div key={deck.archetype} className="flex items-center justify-between">
                   <span className="text-sm text-text-primary truncate">
-                    {deck.name}
+                    {deck.archetype}
                   </span>
                   <span className="text-sm text-accent-cyan font-medium ml-2">
                     {deck.completeness}%
@@ -160,16 +186,7 @@ function SingleFormatCoverage({
 /**
  * Multi-format coverage display (when no format is specified)
  */
-function MultiFormatCoverage({
-  data,
-}: {
-  data: {
-    standard: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-    modern: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-    commander: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-    brawl: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-  };
-}) {
+function MultiFormatCoverageDisplay({ data }: { data: MultiFormatCoverage }) {
   const formats = [
     { key: 'standard', label: 'Standard', data: data.standard },
     { key: 'modern', label: 'Modern', data: data.modern },
@@ -260,7 +277,7 @@ export function CollectionCoverage({
   if (isSingleFormatCoverage(data)) {
     return (
       <div className={className}>
-        <SingleFormatCoverage data={data} />
+        <SingleFormatCoverageDisplay data={data} />
       </div>
     );
   }
@@ -268,12 +285,7 @@ export function CollectionCoverage({
   // Multi-format response
   return (
     <div className={className}>
-      <MultiFormatCoverage data={data as {
-        standard: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-        modern: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-        commander: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-        brawl: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
-      }} />
+      <MultiFormatCoverageDisplay data={data as MultiFormatCoverage} />
     </div>
   );
 }
