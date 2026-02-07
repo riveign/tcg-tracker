@@ -453,7 +453,7 @@ export const recommendationsRouter = router({
 
       // 2. Load deck with cards and verify format match
       const deck = await loadDeckWithCards(deckId, ctx.user.userId);
-      if (deck.format && deck.format !== format) {
+      if (deck.format && deck.format.toLowerCase() !== format.toLowerCase()) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `Deck format (${deck.format}) does not match requested format (${format})`,

@@ -73,8 +73,9 @@ function SuggestionCard({
               className="w-full h-auto object-cover hover:opacity-90 transition-opacity"
             />
             {/* Synergy Score Badge */}
-            <div className="absolute bottom-2 right-2 bg-accent-cyan text-background font-bold px-2 py-1 rounded text-sm">
-              {Math.round(score.total)}
+            <div className="absolute bottom-2 right-2 bg-gradient-to-br from-accent-cyan to-accent-lavender text-white font-bold px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5">
+              <span className="text-xs opacity-90">Synergy</span>
+              <span className="text-lg">{Math.round(score.total)}</span>
             </div>
             {/* Owned Badge */}
             {suggestion.inCollection && (
@@ -106,6 +107,36 @@ function SuggestionCard({
                 {category}
               </Badge>
             ))}
+          </div>
+
+          {/* Score Breakdown */}
+          <div className="pt-2 border-t border-border">
+            <div className="text-xs text-text-secondary space-y-0.5">
+              {score.mechanical > 0 && (
+                <div className="flex justify-between">
+                  <span>Mechanical</span>
+                  <span className="font-medium text-accent-cyan">+{Math.round(score.mechanical)}</span>
+                </div>
+              )}
+              {score.strategic > 0 && (
+                <div className="flex justify-between">
+                  <span>Strategic</span>
+                  <span className="font-medium text-text-primary">+{Math.round(score.strategic)}</span>
+                </div>
+              )}
+              {score.formatContext > 0 && (
+                <div className="flex justify-between">
+                  <span>Format Fit</span>
+                  <span className="font-medium text-text-primary">+{Math.round(score.formatContext)}</span>
+                </div>
+              )}
+              {score.theme > 0 && (
+                <div className="flex justify-between">
+                  <span>Theme</span>
+                  <span className="font-medium text-text-primary">+{Math.round(score.theme)}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </CardContent>

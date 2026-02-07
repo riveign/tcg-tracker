@@ -4,6 +4,7 @@ import { publicProcedure, protectedProcedure, router } from '../lib/trpc.js';
 import { db, decks, deckCards, cards, collections, collectionCards } from '@tcg-tracker/db';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { handlePromise } from '../lib/utils.js';
+import { getCardById, transformScryfallCard } from '../lib/scryfall.js';
 
 // Input schemas
 const createDeckSchema = z.object({
@@ -253,6 +254,9 @@ export const decksRouter = router({
   addCard: protectedProcedure
     .input(addCardToDeckSchema)
     .mutation(async ({ ctx, input }) => {
+      console.error('===== ADD CARD TO DECK START =====');
+      console.error('Input:', JSON.stringify(input, null, 2));
+
       // Verify deck ownership
       const { data: deck, error: deckError } = await handlePromise(
         db.query.decks.findFirst({
@@ -276,6 +280,74 @@ export const decksRouter = router({
           code: 'NOT_FOUND',
           message: 'Deck not found',
         });
+      }
+
+      // Check if card exists in our database, fetch from Scryfall if not
+      console.log('[addCard] Checking for card in database:', input.cardId);
+      const { data: existingCard, error: cardFetchError } = await handlePromise(
+        db.query.cards.findFirst({
+          where: eq(cards.id, input.cardId),
+        })
+      );
+
+      if (cardFetchError) {
+        console.error('[addCard] Error checking card in database:', cardFetchError);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch card from database',
+        });
+      }
+
+      // If card doesn't exist in our database, fetch from Scryfall and cache it
+      if (!existingCard) {
+        console.log('[addCard] Card not in database, fetching from Scryfall:', input.cardId);
+        const scryfallCard = await getCardById(input.cardId);
+
+        if (!scryfallCard) {
+          console.error('[addCard] Card not found on Scryfall:', input.cardId);
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Card not found on Scryfall',
+          });
+        }
+
+        console.log('[addCard] Got card from Scryfall:', scryfallCard.name);
+        const transformedCard = transformScryfallCard(scryfallCard);
+        console.log('[addCard] Transformed card for insert:', { id: transformedCard.id, name: transformedCard.name });
+
+        const { data: insertResult, error: cardInsertError } = await handlePromise(
+          db
+            .insert(cards)
+            .values(transformedCard)
+            .onConflictDoUpdate({
+              target: cards.id,
+              set: { updatedAt: new Date() },
+            })
+            .returning()
+        );
+
+        if (cardInsertError) {
+          console.error('[addCard] Failed to insert card into database:', cardInsertError);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to cache card',
+            cause: cardInsertError,
+          });
+        }
+
+        const [newCard] = insertResult;
+
+        if (!newCard) {
+          console.error('[addCard] Card insert returned no result');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to cache card',
+          });
+        }
+
+        console.log('[addCard] Successfully cached card:', newCard.id);
+      } else {
+        console.log('[addCard] Card already exists in database:', existingCard.id);
       }
 
       // If deck is collection-only, verify card exists in the specified collection(s)
@@ -318,35 +390,81 @@ export const decksRouter = router({
         }
       }
 
-      // Add or update card in deck
-      const { data: insertResult, error: insertError } = await handlePromise(
-        db
-          .insert(deckCards)
-          .values({
-            deckId: input.deckId,
-            cardId: input.cardId,
-            quantity: input.quantity,
-            cardType: input.cardType
-          })
-          .onConflictDoUpdate({
-            target: [deckCards.deckId, deckCards.cardId, deckCards.cardType],
-            set: {
-              quantity: input.quantity,
-              updatedAt: new Date(),
-              deletedAt: null
-            }
-          })
-          .returning()
+      // Check if card is already in deck
+      console.log('[addCard] Checking if card already in deck');
+      const { data: existingDeckCard, error: existingCardError } = await handlePromise(
+        db.query.deckCards.findFirst({
+          where: and(
+            eq(deckCards.deckId, input.deckId),
+            eq(deckCards.cardId, input.cardId),
+            eq(deckCards.cardType, input.cardType),
+            isNull(deckCards.deletedAt)
+          ),
+        })
       );
 
-      if (insertError) {
+      if (existingCardError) {
+        console.error('[addCard] Failed to check existing card:', existingCardError);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to add card to deck',
+          message: 'Failed to check if card is already in deck',
         });
       }
 
-      const [deckCard] = insertResult;
+      let deckCard;
+
+      if (existingDeckCard) {
+        // Update quantity
+        console.log('[addCard] Card exists, updating quantity');
+        const { data: updateResult, error: updateError } = await handlePromise(
+          db
+            .update(deckCards)
+            .set({
+              quantity: input.quantity,
+              updatedAt: new Date(),
+            })
+            .where(eq(deckCards.id, existingDeckCard.id))
+            .returning()
+        );
+
+        if (updateError) {
+          console.error('[addCard] Failed to update card quantity:', updateError);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update card quantity in deck',
+          });
+        }
+
+        const [updated] = updateResult;
+        deckCard = updated;
+      } else {
+        // Insert new card
+        console.log('[addCard] Card does not exist, inserting new');
+        const { data: insertResult, error: insertError } = await handlePromise(
+          db
+            .insert(deckCards)
+            .values({
+              deckId: input.deckId,
+              cardId: input.cardId,
+              quantity: input.quantity,
+              cardType: input.cardType
+            })
+            .returning()
+        );
+
+        if (insertError) {
+          console.error('[addCard] Failed to insert card:', insertError);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to add card to deck',
+          });
+        }
+
+        const [inserted] = insertResult;
+        deckCard = inserted;
+      }
+
+      console.log('[addCard] Successfully added/updated card in deck:', deckCard?.id);
       return deckCard;
     }),
 
