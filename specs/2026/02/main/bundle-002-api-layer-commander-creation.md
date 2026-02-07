@@ -999,3 +999,57 @@ EOF
 | Strategy values are validated against format (L47) | Task 3 validates strategy as string max 50 chars |
 | Existing deck creation still works (backward compatible) (L48) | All new fields are optional with defaults |
 | Type checking passes (L49) | Task 7 runs type-check |
+
+## TEST Stage Completed
+
+### Test Execution Summary
+
+**Date**: 2026-02-07
+**Status**: ✅ ALL TESTS PASSED
+
+**Results**:
+- Total API Tests: 151/151 passed (100%)
+- New Tests Added: 13 (deck schema validation + canBeCommander logic)
+- TypeScript Type Check: ✅ PASSED
+- ESLint Validation: ✅ PASSED (all modified files clean)
+- Component Build: ✅ PASSED (CommanderSelector builds without errors)
+
+**Test Coverage**:
+1. Schema Validation (8 tests):
+   - Valid deck with commanderId, colors, strategy
+   - Backward compatibility (optional fields)
+   - Color validation (WUBRG enum)
+   - Strategy max length validation
+   - UUID format validation
+   - Null value handling
+   - Empty colors array
+   - Five-color validation
+
+2. Commander Validation Logic (5 tests):
+   - Legendary creature (valid)
+   - Non-legendary creature (invalid)
+   - Legendary non-creature (invalid)
+   - "Can be your commander" oracle text (valid)
+   - Non-creature spell (invalid)
+
+**Files Verified**:
+- `/apps/web/src/components/cards/CardSearch.tsx` - ScryfallCard interface extension
+- `/apps/web/src/components/decks/CommanderSelector.tsx` - New component with validation
+- `/apps/api/src/router/decks.ts` - API schema and mutation updates
+- `/apps/api/src/router/__tests__/decks.test.ts` - Unit tests for validation
+
+**Validation Results**:
+- ✅ Commander validation function works correctly (5/5 test cases)
+- ✅ Schema accepts new fields with proper validation (8/8 test cases)
+- ✅ Type safety maintained across all modified files
+- ✅ No lint errors in implementation code
+- ✅ Backward compatibility verified (existing tests still pass)
+
+**Test Report**: `/home/mantis/Development/tcg-tracker/outputs/orc/2026/02/07/200757-8bac6575/06-test/summary.md`
+
+### Known Issues (Pre-existing, Out of Scope)
+- 2 web component test files missing `@testing-library/react` dependency
+- 4 pre-existing lint warnings/errors in unmodified files
+
+### Conclusion
+All acceptance criteria met. Implementation is production-ready.
