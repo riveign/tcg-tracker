@@ -151,6 +151,11 @@ export const DeckDialog = ({
   const canAdvanceFromStep2 = true // Step 2 fields are optional
 
   const onSubmit = async (values: DeckFormValues) => {
+    // Prevent submission if not on final step (unless editing)
+    if (!isEditing && currentStep < TOTAL_STEPS) {
+      return
+    }
+
     try {
       setIsSubmitting(true)
 
@@ -220,8 +225,14 @@ export const DeckDialog = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     // Prevent Enter key from submitting form during multi-step flow
     if (e.key === 'Enter' && !isEditing && currentStep < TOTAL_STEPS) {
+      // Don't prevent if target is a button or select
+      const target = e.target as HTMLElement
+      if (target.tagName === 'BUTTON' || target.getAttribute('role') === 'combobox') {
+        return
+      }
+
       e.preventDefault()
-      // Optionally advance to next step if current step is valid
+      // Advance to next step if current step is valid
       if (
         (currentStep === 1 && canAdvanceFromStep1) ||
         (currentStep === 2 && canAdvanceFromStep2)
