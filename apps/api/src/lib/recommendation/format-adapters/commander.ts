@@ -156,6 +156,42 @@ const ARCHETYPE_MODIFIERS: Record<string, ArchetypeModifiers> = {
     preferredKeywords: ['create', 'token', 'populate'],
     avoidKeywords: [],
   },
+  stax: {
+    categoryWeights: {
+      removal: 1.4,
+      protection: 1.3,
+      cardDraw: 1.2,
+    },
+    preferredKeywords: ['tap', 'sacrifice', 'counter'],
+    avoidKeywords: [],
+  },
+  lands: {
+    categoryWeights: {
+      lands: 1.5,
+      ramp: 1.6,
+      creatures: 0.8,
+    },
+    preferredKeywords: ['landfall', 'land'],
+    avoidKeywords: [],
+  },
+  artifacts: {
+    categoryWeights: {
+      ramp: 1.4,
+      cardDraw: 1.3,
+      protection: 1.2,
+    },
+    preferredKeywords: ['artifact', 'affinity', 'metalcraft'],
+    avoidKeywords: [],
+  },
+  enchantments: {
+    categoryWeights: {
+      protection: 1.4,
+      cardDraw: 1.3,
+      removal: 1.2,
+    },
+    preferredKeywords: ['enchantment', 'constellation', 'aura'],
+    avoidKeywords: [],
+  },
   default: {
     categoryWeights: {},
     preferredKeywords: [],
@@ -443,6 +479,15 @@ export class CommanderAdapter implements FormatAdapter {
   // ===========================================================================
 
   getColorConstraint(deck: DeckWithCards): ColorConstraint {
+    // Priority 1: Use deck.colors metadata when present (from deck creation wizard)
+    if (deck.colors && deck.colors.length > 0) {
+      return {
+        allowedColors: deck.colors,
+        enforced: true,
+      };
+    }
+
+    // Priority 2: Fall back to commander card lookup (legacy behavior)
     const commanderCard = deck.cards.find((c) => c.cardType === 'commander');
 
     if (!commanderCard) {

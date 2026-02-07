@@ -22,6 +22,7 @@ import {
   type CategoryAnalysis,
   type CategoryTarget,
   type CardCategory,
+  type ManaColor,
 } from '../lib/recommendation/index.js';
 
 // =============================================================================
@@ -168,6 +169,11 @@ async function loadDeckWithCards(
   // Find commander if present
   const commander = deckCardsFormatted.find((dc) => dc.cardType === 'commander');
 
+  // Parse colors array from database (stored as text[])
+  const deckColors = (deck.colors as string[] | null)?.filter((c): c is ManaColor =>
+    ['W', 'U', 'B', 'R', 'G'].includes(c)
+  ) ?? [];
+
   return {
     id: deck.id,
     name: deck.name,
@@ -175,6 +181,9 @@ async function loadDeckWithCards(
     collectionId: deck.collectionId,
     cards: deckCardsFormatted,
     commander,
+    commanderId: deck.commanderId ?? null,
+    colors: deckColors,
+    strategy: deck.strategy ?? null,
   };
 }
 
@@ -329,7 +338,12 @@ function detectArchetype(
   deck: DeckWithCards,
   adapter: ReturnType<typeof FormatAdapterFactory.create>
 ): string {
-  // Simplified archetype detection for Phase 1
+  // Use explicit strategy when present (Phase 6 enhancement)
+  if (deck.strategy) {
+    return deck.strategy;
+  }
+
+  // Fall back to simple detection for legacy decks
   const mainboardCards = deck.cards.filter((c) => c.cardType === 'mainboard');
   const totalCards = mainboardCards.reduce((sum, c) => sum + c.quantity, 0);
 
@@ -498,6 +512,8 @@ export const recommendationsRouter = router({
             gaps,
             stage,
             adapter,
+            deckStrategy: deck.strategy ?? null,
+            deckColors: deck.colors ?? [],
           });
 
           return {

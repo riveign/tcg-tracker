@@ -224,6 +224,41 @@ export class ArchetypeDetector {
   }
 
   /**
+   * Get the effective archetype for a deck, preferring explicit strategy over detection
+   *
+   * @param deck The deck to analyze
+   * @param adapter The format adapter
+   * @returns The archetype string to use for recommendations
+   *
+   * @example
+   * ```typescript
+   * // Deck with strategy set from creation wizard
+   * const deck = { ...deckData, strategy: 'tribal' };
+   * const archetype = ArchetypeDetector.getEffectiveArchetype(deck, adapter);
+   * // Returns 'tribal' (uses explicit strategy)
+   *
+   * // Legacy deck without strategy
+   * const legacyDeck = { ...deckData, strategy: null };
+   * const archetype = ArchetypeDetector.getEffectiveArchetype(legacyDeck, adapter);
+   * // Returns detected archetype from card analysis
+   * ```
+   */
+  static getEffectiveArchetype(deck: DeckWithCards, adapter: FormatAdapter): string {
+    // Priority 1: Use explicit strategy from deck metadata
+    if (deck.strategy) {
+      // Validate strategy is recognized by checking if adapter has modifiers for it
+      const modifiers = adapter.getArchetypeModifiers(deck.strategy);
+      // If we get default modifiers (empty categoryWeights), strategy may not be recognized
+      // but we still use it as it provides user intent
+      return deck.strategy;
+    }
+
+    // Priority 2: Fall back to detection (legacy decks)
+    const result = this.detect(deck, adapter);
+    return result.primary;
+  }
+
+  /**
    * Check if a deck matches a specific archetype
    *
    * @param deck The deck to check
