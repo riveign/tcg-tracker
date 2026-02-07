@@ -4,6 +4,7 @@ import { collectionsRouter } from './collections.js';
 import { cardsRouter } from './cards.js';
 import { completeRouter } from './complete.js';
 import { decksRouter } from './decks.js';
+import { passwordResetRouter } from './password-reset.js';
 
 /**
  * Root tRPC router
@@ -14,6 +15,7 @@ export const appRouter = router({
   cards: cardsRouter,
   complete: completeRouter,
   decks: decksRouter,
+  passwordReset: passwordResetRouter,
 });
 
 export type AppRouter = typeof appRouter;

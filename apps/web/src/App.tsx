@@ -17,6 +17,8 @@ import { Decks } from '@/pages/Decks'
 import { DeckDetail } from '@/pages/DeckDetail'
 import { Login } from '@/pages/Login'
 import { Signup } from '@/pages/Signup'
+import { ForgotPassword } from '@/pages/ForgotPassword'
+import { ResetPassword } from '@/pages/ResetPassword'
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -60,6 +62,8 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Protected routes */}
       <Route

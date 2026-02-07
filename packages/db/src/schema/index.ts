@@ -6,3 +6,4 @@ export * from "./collection-members";
 export * from "./collection-cards";
 export * from "./decks";
 export * from "./deck-cards";
+export * from "./password-reset-tokens";

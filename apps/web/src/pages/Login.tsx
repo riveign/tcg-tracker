@@ -89,7 +89,15 @@ export const Login = () => {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-accent-cyan hover:text-accent-lavender transition-colors"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <FormControl>
                       <Input
                         type="password"

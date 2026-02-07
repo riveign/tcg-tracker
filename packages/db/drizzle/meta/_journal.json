@@ -8,6 +8,13 @@
       "when": 1769951806295,
       "tag": "0000_fine_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770464227667,
+      "tag": "0001_thin_captain_cross",
+      "breakpoints": true
     }
   ]
 }
