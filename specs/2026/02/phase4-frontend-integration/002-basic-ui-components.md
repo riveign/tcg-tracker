@@ -160,3 +160,780 @@ type FormatType = 'standard' | 'modern' | 'commander' | 'brawl';
 - UI primitives available in `@/components/ui/`
 - Tailwind theme configured with required colors
 - `lucide-react` available for icons
+
+## PLAN Stage
+
+### Files
+
+- `/apps/web/src/components/recommendations/FormatSelector.tsx` (CREATE)
+  - FormatSelector component with Select primitives
+  - Props: value, onValueChange, disabled?, className?
+  - Format display labels and responsive styling
+- `/apps/web/src/components/recommendations/CollectionCoverage.tsx` (CREATE)
+  - CollectionCoverage component using useFormatCoverage hook
+  - Stats grid with Card components
+  - Progress bar for coverage percentage
+  - Loading and error state handling
+- `/apps/web/src/components/recommendations/index.ts` (CREATE)
+  - Barrel exports for FormatSelector and CollectionCoverage
+- `/apps/web/src/components/recommendations/__tests__/FormatSelector.test.tsx` (CREATE)
+  - Unit tests for FormatSelector component
+- `/apps/web/src/components/recommendations/__tests__/CollectionCoverage.test.tsx` (CREATE)
+  - Unit tests for CollectionCoverage component
+
+### Tasks
+
+#### Task 1 — Create FormatSelector Component
+
+**Tools:** Write
+
+**File:** `/apps/web/src/components/recommendations/FormatSelector.tsx`
+
+**Description:** Create FormatSelector component that displays a dropdown with all supported formats (Standard, Commander, Modern, Brawl) using existing Radix Select primitives.
+
+**Full Content:**
+
+````typescript
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+/**
+ * Supported MTG format types
+ */
+export type FormatType = 'standard' | 'modern' | 'commander' | 'brawl';
+
+/**
+ * Format display configuration
+ */
+const FORMAT_OPTIONS: { value: FormatType; label: string }[] = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'modern', label: 'Modern' },
+  { value: 'commander', label: 'Commander' },
+  { value: 'brawl', label: 'Brawl' },
+];
+
+/**
+ * Props for the FormatSelector component
+ */
+export interface FormatSelectorProps {
+  /** Currently selected format */
+  value: FormatType;
+  /** Callback when format selection changes */
+  onValueChange: (value: FormatType) => void;
+  /** Whether the selector is disabled */
+  disabled?: boolean;
+  /** Additional CSS classes */
+  className?: string;
+  /** Placeholder text when no format is selected */
+  placeholder?: string;
+}
+
+/**
+ * FormatSelector - Dropdown for selecting MTG format
+ *
+ * Displays all supported formats with proper capitalization.
+ * Uses Radix Select primitives for accessibility.
+ */
+export function FormatSelector({
+  value,
+  onValueChange,
+  disabled = false,
+  className,
+  placeholder = 'Select format',
+}: FormatSelectorProps) {
+  return (
+    <Select
+      value={value}
+      onValueChange={(v) => onValueChange(v as FormatType)}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        className={cn(
+          'w-full md:w-[180px] bg-background-surface border-border',
+          'text-text-primary focus:ring-accent-cyan',
+          className
+        )}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="bg-background-surface border-border">
+        {FORMAT_OPTIONS.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value}
+            className="text-text-primary focus:bg-accent-cyan/20 focus:text-text-primary"
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+````
+
+**Verification:**
+- Run: `pnpm exec eslint apps/web/src/components/recommendations/FormatSelector.tsx --fix`
+- Run: `pnpm exec tsc --noEmit`
+
+---
+
+#### Task 2 — Create CollectionCoverage Component
+
+**Tools:** Write
+
+**File:** `/apps/web/src/components/recommendations/CollectionCoverage.tsx`
+
+**Description:** Create CollectionCoverage component that displays visual coverage metrics using the useFormatCoverage hook. Shows progress bars, card counts, and archetype information with loading/error states.
+
+**Full Content:**
+
+````typescript
+import { Card, CardContent } from '@/components/ui/card';
+import { useFormatCoverage, type FormatCoverageOutput } from '@/hooks/useRecommendations';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { FormatType } from './FormatSelector';
+
+/**
+ * Props for the CollectionCoverage component
+ */
+export interface CollectionCoverageProps {
+  /** Collection ID to analyze */
+  collectionId: string;
+  /** Optional format filter - if omitted, shows all formats */
+  format?: FormatType;
+  /** Additional CSS classes */
+  className?: string;
+}
+
+/**
+ * Type guard for single format coverage response
+ */
+function isSingleFormatCoverage(
+  data: FormatCoverageOutput
+): data is {
+  format: FormatType;
+  totalLegalCards: number;
+  viableArchetypes: string[];
+  buildableDecks: Array<{ name: string; completeness: number }>;
+} {
+  return 'format' in data && typeof data.format === 'string';
+}
+
+/**
+ * Progress bar component for coverage visualization
+ */
+function CoverageProgressBar({ percentage, label }: { percentage: number; label: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-sm">
+        <span className="text-text-secondary">{label}</span>
+        <span className="text-text-primary font-medium">{percentage}%</span>
+      </div>
+      <div className="bg-background rounded-full h-2 overflow-hidden">
+        <div
+          className="bg-accent-cyan h-full transition-all duration-300 rounded-full"
+          style={{ width: `${Math.min(100, percentage)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Single format coverage display
+ */
+function SingleFormatCoverage({
+  data,
+}: {
+  data: {
+    format: FormatType;
+    totalLegalCards: number;
+    viableArchetypes: string[];
+    buildableDecks: Array<{ name: string; completeness: number }>;
+  };
+}) {
+  // Calculate coverage percentage based on viable archetypes
+  const coveragePercentage = data.viableArchetypes.length > 0
+    ? Math.min(100, Math.round((data.viableArchetypes.length / 5) * 100))
+    : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-text-secondary">Legal Cards</div>
+            <div className="text-2xl font-bold text-text-primary mt-1">
+              {data.totalLegalCards.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-text-secondary">Viable Archetypes</div>
+            <div className="text-2xl font-bold text-text-primary mt-1">
+              {data.viableArchetypes.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-text-secondary">Buildable Decks</div>
+            <div className="text-2xl font-bold text-text-primary mt-1">
+              {data.buildableDecks.length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Coverage Progress */}
+      <Card>
+        <CardContent className="p-4">
+          <CoverageProgressBar
+            percentage={coveragePercentage}
+            label="Format Coverage"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Archetypes List */}
+      {data.viableArchetypes.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-text-secondary mb-3">
+              Viable Archetypes
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {data.viableArchetypes.map((archetype) => (
+                <span
+                  key={archetype}
+                  className="px-2 py-1 bg-accent-cyan/20 text-accent-cyan text-sm rounded-md"
+                >
+                  {archetype}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Buildable Decks Preview */}
+      {data.buildableDecks.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-text-secondary mb-3">
+              Top Buildable Decks
+            </div>
+            <div className="space-y-2">
+              {data.buildableDecks.slice(0, 5).map((deck) => (
+                <div key={deck.name} className="flex items-center justify-between">
+                  <span className="text-sm text-text-primary truncate">
+                    {deck.name}
+                  </span>
+                  <span className="text-sm text-accent-cyan font-medium ml-2">
+                    {deck.completeness}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Multi-format coverage display (when no format is specified)
+ */
+function MultiFormatCoverage({
+  data,
+}: {
+  data: {
+    standard: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+    modern: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+    commander: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+    brawl: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+  };
+}) {
+  const formats = [
+    { key: 'standard', label: 'Standard', data: data.standard },
+    { key: 'modern', label: 'Modern', data: data.modern },
+    { key: 'commander', label: 'Commander', data: data.commander },
+    { key: 'brawl', label: 'Brawl', data: data.brawl },
+  ] as const;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {formats.map(({ key, label, data: formatData }) => (
+        <Card key={key}>
+          <CardContent className="p-4">
+            <div className="text-sm font-medium text-text-secondary mb-2">
+              {label}
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Legal Cards</span>
+                <span className="text-text-primary font-medium">
+                  {formatData.totalLegalCards.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Archetypes</span>
+                <span className="text-accent-cyan font-medium">
+                  {formatData.viableArchetypes.length}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Buildable</span>
+                <span className="text-accent-lavender font-medium">
+                  {formatData.buildableDecks.length}
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * CollectionCoverage - Visual coverage metrics for a collection
+ *
+ * Displays format coverage including legal cards, viable archetypes,
+ * and buildable decks. Supports single format or all-format view.
+ */
+export function CollectionCoverage({
+  collectionId,
+  format,
+  className,
+}: CollectionCoverageProps) {
+  const { data, isLoading, error } = useFormatCoverage(
+    { collectionId, format },
+    { enabled: Boolean(collectionId) }
+  );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className={cn('flex items-center justify-center py-8', className)}>
+        <Loader2 className="w-8 h-8 animate-spin text-accent-cyan" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className={cn('text-center py-8', className)}>
+        <p className="text-red-400 text-sm">Failed to load coverage data</p>
+        <p className="text-text-secondary text-xs mt-1">{error.message}</p>
+      </div>
+    );
+  }
+
+  // No data state
+  if (!data) {
+    return (
+      <div className={cn('text-center py-8', className)}>
+        <p className="text-text-secondary text-sm">No coverage data available</p>
+      </div>
+    );
+  }
+
+  // Render based on response type
+  if (isSingleFormatCoverage(data)) {
+    return (
+      <div className={className}>
+        <SingleFormatCoverage data={data} />
+      </div>
+    );
+  }
+
+  // Multi-format response
+  return (
+    <div className={className}>
+      <MultiFormatCoverage data={data as {
+        standard: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+        modern: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+        commander: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+        brawl: { format: string; totalLegalCards: number; viableArchetypes: string[]; buildableDecks: unknown[] };
+      }} />
+    </div>
+  );
+}
+````
+
+**Verification:**
+- Run: `pnpm exec eslint apps/web/src/components/recommendations/CollectionCoverage.tsx --fix`
+- Run: `pnpm exec tsc --noEmit`
+
+---
+
+#### Task 3 — Create Barrel Export
+
+**Tools:** Write
+
+**File:** `/apps/web/src/components/recommendations/index.ts`
+
+**Description:** Create barrel export file for recommendations components.
+
+**Full Content:**
+
+````typescript
+export { FormatSelector, type FormatSelectorProps, type FormatType } from './FormatSelector';
+export { CollectionCoverage, type CollectionCoverageProps } from './CollectionCoverage';
+````
+
+**Verification:**
+- Run: `pnpm exec eslint apps/web/src/components/recommendations/index.ts --fix`
+
+---
+
+#### Task 4 — Create FormatSelector Unit Tests
+
+**Tools:** Write
+
+**File:** `/apps/web/src/components/recommendations/__tests__/FormatSelector.test.tsx`
+
+**Description:** Create unit tests for FormatSelector component covering rendering, selection, and disabled state.
+
+**Full Content:**
+
+````typescript
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { FormatSelector, type FormatType } from '../FormatSelector';
+
+describe('FormatSelector', () => {
+  const defaultProps = {
+    value: 'standard' as FormatType,
+    onValueChange: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders with selected value', () => {
+    render(<FormatSelector {...defaultProps} />);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByText('Standard')).toBeInTheDocument();
+  });
+
+  it('displays all format options when opened', async () => {
+    const user = userEvent.setup();
+    render(<FormatSelector {...defaultProps} />);
+
+    await user.click(screen.getByRole('combobox'));
+
+    expect(screen.getByRole('option', { name: 'Standard' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Modern' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Commander' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Brawl' })).toBeInTheDocument();
+  });
+
+  it('calls onValueChange when a format is selected', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<FormatSelector {...defaultProps} onValueChange={onValueChange} />);
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(screen.getByRole('option', { name: 'Commander' }));
+
+    expect(onValueChange).toHaveBeenCalledWith('commander');
+  });
+
+  it('renders in disabled state', () => {
+    render(<FormatSelector {...defaultProps} disabled />);
+    expect(screen.getByRole('combobox')).toBeDisabled();
+  });
+
+  it('displays placeholder when specified', () => {
+    render(
+      <FormatSelector
+        {...defaultProps}
+        value={'' as FormatType}
+        placeholder="Choose a format"
+      />
+    );
+    expect(screen.getByText('Choose a format')).toBeInTheDocument();
+  });
+
+  it('applies custom className', () => {
+    render(<FormatSelector {...defaultProps} className="custom-class" />);
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveClass('custom-class');
+  });
+});
+````
+
+**Verification:**
+- Run: `pnpm exec vitest run apps/web/src/components/recommendations/__tests__/FormatSelector.test.tsx`
+
+---
+
+#### Task 5 — Create CollectionCoverage Unit Tests
+
+**Tools:** Write
+
+**File:** `/apps/web/src/components/recommendations/__tests__/CollectionCoverage.test.tsx`
+
+**Description:** Create unit tests for CollectionCoverage component covering loading, error, single-format, and multi-format states.
+
+**Full Content:**
+
+````typescript
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { CollectionCoverage } from '../CollectionCoverage';
+
+// Mock the useFormatCoverage hook
+vi.mock('@/hooks/useRecommendations', () => ({
+  useFormatCoverage: vi.fn(),
+}));
+
+import { useFormatCoverage } from '@/hooks/useRecommendations';
+
+const mockUseFormatCoverage = vi.mocked(useFormatCoverage);
+
+describe('CollectionCoverage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders loading state', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as ReturnType<typeof useFormatCoverage>);
+
+    render(<CollectionCoverage collectionId="test-id" format="standard" />);
+    expect(screen.getByRole('status', { hidden: true })).toBeInTheDocument();
+  });
+
+  it('renders error state', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: { message: 'Failed to fetch' },
+    } as unknown as ReturnType<typeof useFormatCoverage>);
+
+    render(<CollectionCoverage collectionId="test-id" format="standard" />);
+    expect(screen.getByText('Failed to load coverage data')).toBeInTheDocument();
+    expect(screen.getByText('Failed to fetch')).toBeInTheDocument();
+  });
+
+  it('renders single format coverage data', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: {
+        format: 'standard',
+        totalLegalCards: 150,
+        viableArchetypes: ['aggro', 'control', 'midrange'],
+        buildableDecks: [
+          { name: 'Mono Red Aggro', completeness: 95 },
+          { name: 'Blue Control', completeness: 80 },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useFormatCoverage>);
+
+    render(<CollectionCoverage collectionId="test-id" format="standard" />);
+
+    expect(screen.getByText('Legal Cards')).toBeInTheDocument();
+    expect(screen.getByText('150')).toBeInTheDocument();
+    expect(screen.getByText('Viable Archetypes')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('aggro')).toBeInTheDocument();
+    expect(screen.getByText('control')).toBeInTheDocument();
+    expect(screen.getByText('Mono Red Aggro')).toBeInTheDocument();
+    expect(screen.getByText('95%')).toBeInTheDocument();
+  });
+
+  it('renders multi-format coverage when no format specified', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: {
+        standard: { format: 'standard', totalLegalCards: 100, viableArchetypes: ['aggro'], buildableDecks: [] },
+        modern: { format: 'modern', totalLegalCards: 200, viableArchetypes: ['combo'], buildableDecks: [] },
+        commander: { format: 'commander', totalLegalCards: 500, viableArchetypes: [], buildableDecks: [] },
+        brawl: { format: 'brawl', totalLegalCards: 80, viableArchetypes: [], buildableDecks: [] },
+      },
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useFormatCoverage>);
+
+    render(<CollectionCoverage collectionId="test-id" />);
+
+    expect(screen.getByText('Standard')).toBeInTheDocument();
+    expect(screen.getByText('Modern')).toBeInTheDocument();
+    expect(screen.getByText('Commander')).toBeInTheDocument();
+    expect(screen.getByText('Brawl')).toBeInTheDocument();
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText('200')).toBeInTheDocument();
+    expect(screen.getByText('500')).toBeInTheDocument();
+  });
+
+  it('renders empty state when no data', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    } as ReturnType<typeof useFormatCoverage>);
+
+    render(<CollectionCoverage collectionId="test-id" format="standard" />);
+    expect(screen.getByText('No coverage data available')).toBeInTheDocument();
+  });
+
+  it('applies custom className', () => {
+    mockUseFormatCoverage.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as ReturnType<typeof useFormatCoverage>);
+
+    const { container } = render(
+      <CollectionCoverage collectionId="test-id" className="custom-class" />
+    );
+    expect(container.firstChild).toHaveClass('custom-class');
+  });
+});
+````
+
+**Verification:**
+- Run: `pnpm exec vitest run apps/web/src/components/recommendations/__tests__/CollectionCoverage.test.tsx`
+
+---
+
+#### Task 6 — Lint All Modified Files
+
+**Tools:** Bash
+
+**Description:** Run eslint with fix on all created files to ensure code style compliance.
+
+**Commands:**
+```bash
+cd /home/mantis/Development/tcg-tracker && pnpm exec eslint apps/web/src/components/recommendations/FormatSelector.tsx apps/web/src/components/recommendations/CollectionCoverage.tsx apps/web/src/components/recommendations/index.ts --fix
+```
+
+**Verification:**
+- Command exits with code 0
+- No remaining lint errors
+
+---
+
+#### Task 7 — Type Check
+
+**Tools:** Bash
+
+**Description:** Run TypeScript type checking to ensure no type errors.
+
+**Commands:**
+```bash
+cd /home/mantis/Development/tcg-tracker && pnpm exec tsc --noEmit
+```
+
+**Verification:**
+- Command exits with code 0
+- No TypeScript errors
+
+---
+
+#### Task 8 — Run Unit Tests
+
+**Tools:** Bash
+
+**Description:** Run all unit tests for the recommendations components.
+
+**Commands:**
+```bash
+cd /home/mantis/Development/tcg-tracker && pnpm exec vitest run apps/web/src/components/recommendations/__tests__/
+```
+
+**Verification:**
+- All tests pass
+- No test failures
+
+---
+
+#### Task 9 — E2E Testing (Manual Verification)
+
+**Tools:** Manual
+
+**Description:** Manual E2E verification since components require integration with existing pages.
+
+**Steps:**
+1. Start the development server: `pnpm dev`
+2. Navigate to a collection page
+3. Verify FormatSelector renders and responds to selection
+4. Verify CollectionCoverage displays coverage data for selected format
+5. Test loading states by throttling network
+6. Test error states by disconnecting network
+7. Test responsive behavior on mobile viewport
+
+**Verification:**
+- Components render without console errors
+- Format selection updates CollectionCoverage data
+- Loading spinner appears during data fetch
+- Error message appears on fetch failure
+- Components are responsive on mobile
+
+---
+
+#### Task 10 — Commit Changes
+
+**Tools:** Bash
+
+**Description:** Commit all created files with proper commit message.
+
+**Commands:**
+```bash
+cd /home/mantis/Development/tcg-tracker && git add apps/web/src/components/recommendations/FormatSelector.tsx apps/web/src/components/recommendations/CollectionCoverage.tsx apps/web/src/components/recommendations/index.ts apps/web/src/components/recommendations/__tests__/FormatSelector.test.tsx apps/web/src/components/recommendations/__tests__/CollectionCoverage.test.tsx && git commit -m "feat(recommendations): add FormatSelector and CollectionCoverage UI components
+
+- FormatSelector: dropdown for Standard/Modern/Commander/Brawl selection
+- CollectionCoverage: visual coverage metrics with progress bars
+- Proper TypeScript types and props interfaces
+- Loading and error state handling
+- Responsive design using Tailwind CSS
+- Unit tests for both components"
+```
+
+**Verification:**
+- Commit created successfully
+- All files included in commit
+
+### Validate
+
+| Requirement | Line | Compliance |
+|-------------|------|------------|
+| FormatSelector component for format dropdown/selector | L10, L23-28 | Task 1 creates FormatSelector with Select primitives, displaying all 4 formats |
+| CollectionCoverage component for visual coverage metrics | L11, L30-37 | Task 2 creates CollectionCoverage with stats grid, progress bars, archetypes display |
+| Responsive design using Tailwind CSS | L12, L28, L35 | Both components use Tailwind responsive classes (w-full md:w-[180px], grid-cols-2 md:grid-cols-3) |
+| Proper TypeScript types and props interfaces | L13, L39-42 | FormatSelectorProps and CollectionCoverageProps interfaces with explicit types |
+| FormatSelector displays Standard, Commander, Modern, Brawl | L24, L50 | FORMAT_OPTIONS array includes all 4 formats |
+| FormatSelector allows user to select a format | L26 | onValueChange callback prop in FormatSelectorProps |
+| FormatSelector emits selected format to parent | L26 | onValueChange(value: FormatType) callback |
+| FormatSelector responsive for mobile | L28 | w-full on mobile, md:w-[180px] on desktop |
+| CollectionCoverage uses useFormatCoverage hook | L31, L63 | Component imports and uses useFormatCoverage from Phase 1 hooks |
+| CollectionCoverage shows coverage breakdown | L33 | Stats grid shows legal cards, viable archetypes, buildable decks counts |
+| CollectionCoverage has progress bars | L34 | CoverageProgressBar component with percentage visualization |
+| CollectionCoverage responsive for mobile | L35 | Grid uses grid-cols-1 md:grid-cols-2 for responsive layout |
+| CollectionCoverage handles loading and error states | L36 | Loading state shows Loader2 spinner, error shows red text message |
+| TypeScript types complete and accurate | L54 | All props typed with explicit interfaces, no `any` types |
+| No TypeScript errors | L55 | Task 7 runs tsc --noEmit verification |
+| Components integrate with Phase 1 hooks | L56 | CollectionCoverage imports useFormatCoverage from @/hooks/useRecommendations |
+| Follow existing UI/UX patterns | L46, L54 | Uses Card/CardContent from ui/card, Loader2 from lucide-react, same patterns as CollectionStats.tsx |
