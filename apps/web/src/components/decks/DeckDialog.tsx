@@ -34,7 +34,6 @@ import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc'
 import { CommanderDeckForm } from './CommanderDeckForm'
 import { ConstructedDeckForm } from './ConstructedDeckForm'
-import { ColorIdentityDisplay } from './ColorPicker'
 
 const deckFormSchema = z.object({
   name: z.string().min(1, 'Deck name is required').max(255),
@@ -52,9 +51,9 @@ const deckFormSchema = z.object({
 
 const FORMATS = ['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other'] as const
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2
 
-const TOTAL_STEPS = 3
+const TOTAL_STEPS = 2
 
 type DeckFormValues = z.infer<typeof deckFormSchema>
 
@@ -71,7 +70,6 @@ export const DeckDialog = ({
 }: DeckDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStep, setCurrentStep] = useState<Step>(1)
-  const [justChangedStep, setJustChangedStep] = useState(false)
   const utils = trpc.useUtils()
   const isEditing = Boolean(deckId)
 
@@ -136,7 +134,6 @@ export const DeckDialog = ({
   useEffect(() => {
     if (!open) {
       setCurrentStep(1)
-      setJustChangedStep(false)
     }
   }, [open])
 
@@ -155,11 +152,6 @@ export const DeckDialog = ({
   const onSubmit = async (values: DeckFormValues) => {
     // Prevent submission if not on final step (unless editing)
     if (!isEditing && currentStep < TOTAL_STEPS) {
-      return
-    }
-
-    // Prevent submission if we just changed steps (debounce)
-    if (!isEditing && justChangedStep) {
       return
     }
 
@@ -214,21 +206,12 @@ export const DeckDialog = ({
   const handleNext = () => {
     if (currentStep < TOTAL_STEPS) {
       setCurrentStep((prev) => (prev + 1) as Step)
-      setJustChangedStep(true)
-      // Clear the flag after a short delay to prevent accidental submissions
-      setTimeout(() => {
-        setJustChangedStep(false)
-      }, 300)
     }
   }
 
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => (prev - 1) as Step)
-      setJustChangedStep(true)
-      setTimeout(() => {
-        setJustChangedStep(false)
-      }, 300)
     }
   }
 
@@ -261,7 +244,7 @@ export const DeckDialog = ({
   // Step indicator component
   const StepIndicator = () => (
     <div className="flex items-center justify-center gap-2 mb-4">
-      {[1, 2, 3].map((step) => (
+      {[1, 2].map((step) => (
         <div key={step} className="flex items-center">
           <div
             className={cn(
@@ -291,11 +274,9 @@ export const DeckDialog = ({
   const getStepTitle = () => {
     switch (currentStep) {
       case 1:
-        return 'Basic Information'
+        return 'Deck Details & Collection'
       case 2:
         return isCommanderFormat ? 'Commander & Strategy' : 'Colors & Strategy'
-      case 3:
-        return 'Collection Settings'
       default:
         return ''
     }
@@ -317,7 +298,7 @@ export const DeckDialog = ({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
-            {/* Step 1: Basic Info */}
+            {/* Step 1: Basic Info + Collection Settings */}
             {(currentStep === 1 || isEditing) && (
               <>
                 <FormField
@@ -390,48 +371,6 @@ export const DeckDialog = ({
                     </FormItem>
                   )}
                 />
-              </>
-            )}
-
-            {/* Step 2: Format-Specific Form */}
-            {currentStep === 2 && !isEditing && (
-              isCommanderFormat ? (
-                <CommanderDeckForm form={form} disabled={isSubmitting} />
-              ) : (
-                <ConstructedDeckForm form={form} disabled={isSubmitting} />
-              )
-            )}
-
-            {/* Step 3: Collection Settings */}
-            {(currentStep === 3 || isEditing) && (
-              <>
-                {/* Summary (create mode only) */}
-                {!isEditing && currentStep === 3 && (
-                  <div className="p-3 bg-surface-elevated rounded-lg space-y-2">
-                    <h4 className="text-sm font-medium text-text-primary">Summary</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-text-secondary">Name:</div>
-                      <div className="text-text-primary">{form.watch('name')}</div>
-
-                      <div className="text-text-secondary">Format:</div>
-                      <div className="text-text-primary">{form.watch('format')}</div>
-
-                      {form.watch('colors')?.length > 0 && (
-                        <>
-                          <div className="text-text-secondary">Colors:</div>
-                          <div><ColorIdentityDisplay colors={form.watch('colors') ?? []} /></div>
-                        </>
-                      )}
-
-                      {form.watch('strategy') && (
-                        <>
-                          <div className="text-text-secondary">Strategy:</div>
-                          <div className="text-text-primary capitalize">{form.watch('strategy')}</div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 <FormField
                   control={form.control}
@@ -488,6 +427,15 @@ export const DeckDialog = ({
                   )}
                 />
               </>
+            )}
+
+            {/* Step 2: Format-Specific Form */}
+            {currentStep === 2 && !isEditing && (
+              isCommanderFormat ? (
+                <CommanderDeckForm form={form} disabled={isSubmitting} />
+              ) : (
+                <ConstructedDeckForm form={form} disabled={isSubmitting} />
+              )
             )}
 
             {/* For editing mode, show all form sections plus strategy/colors */}
