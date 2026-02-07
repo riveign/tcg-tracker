@@ -37,6 +37,8 @@ interface CommanderSelectorProps {
     colorIdentity?: string[]
   } | null
   onSelect: (commander: ScryfallCard | null) => void
+  collectionId?: string | null
+  collectionOnly?: boolean
 }
 
 const COLOR_NAMES: Record<string, string> = {
@@ -89,6 +91,8 @@ export const CommanderSelector = ({
   onOpenChange,
   currentCommander,
   onSelect,
+  collectionId,
+  collectionOnly = false,
 }: CommanderSelectorProps) => {
   const [selectedCard, setSelectedCard] = useState<ScryfallCard | null>(null)
 
@@ -132,8 +136,9 @@ export const CommanderSelector = ({
         <DialogHeader>
           <DialogTitle>Select Commander</DialogTitle>
           <DialogDescription>
-            Search for a legendary creature to use as your commander.
-            Only legendary creatures (and some planeswalkers) can be commanders.
+            {collectionOnly
+              ? "Search for a legendary creature from your collection to use as your commander."
+              : "Search for a legendary creature to use as your commander. Only legendary creatures (and some planeswalkers) can be commanders."}
           </DialogDescription>
         </DialogHeader>
 
@@ -141,7 +146,13 @@ export const CommanderSelector = ({
           {/* Search - always show to allow changing selection */}
           <CardSearch
             onCardSelect={handleCardSelect}
-            placeholder="Search for legendary creatures..."
+            placeholder={
+              collectionOnly
+                ? "Search for legendary creatures in your collection..."
+                : "Search for legendary creatures..."
+            }
+            useCollectionSearch={collectionOnly}
+            collectionId={collectionId}
           />
 
           {/* Selected Commander Preview */}

@@ -54,6 +54,8 @@ export function CommanderDeckForm({ form, disabled = false }: CommanderDeckFormP
 
   const selectedCommander = form.watch('_selectedCommander') as ScryfallCard | null
   const colorIdentity = selectedCommander?.color_identity ?? []
+  const collectionId = form.watch('collectionId') as string | null
+  const collectionOnly = form.watch('collectionOnly') as boolean
 
   const handleCommanderSelect = (commander: ScryfallCard | null) => {
     if (commander) {
@@ -169,6 +171,8 @@ export function CommanderDeckForm({ form, disabled = false }: CommanderDeckFormP
           colorIdentity: selectedCommander.color_identity,
         } : null}
         onSelect={handleCommanderSelect}
+        collectionId={collectionId}
+        collectionOnly={collectionOnly}
       />
     </div>
   )
