@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useSuggestions, type SuggestionsOutput } from '@/hooks/useRecommendations';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FormatType } from './FormatSelector';
+import { trpc } from '@/lib/trpc';
 
 /**
  * Category filter options
@@ -44,9 +45,15 @@ export interface RecommendationPanelProps {
  */
 function SuggestionCard({
   suggestion,
+  deckId,
+  collectionId,
+  format,
   onCardClick,
 }: {
   suggestion: NonNullable<SuggestionsOutput['suggestions']>[number];
+  deckId: string;
+  collectionId: string;
+  format: FormatType;
   onCardClick?: (cardId: string) => void;
 }) {
   const card = suggestion.card;
@@ -57,6 +64,38 @@ function SuggestionCard({
     'normal' in card.imageUris
       ? String(card.imageUris.normal)
       : '';
+
+  const utils = trpc.useUtils();
+  const addCardMutation = trpc.decks.addCard.useMutation({
+    onSuccess: async () => {
+      // Invalidate recommendations to remove the added card from suggestions
+      // Only on success - no need to refetch if nothing changed
+      await utils.recommendations.getSuggestions.invalidate({
+        deckId,
+        collectionId,
+        format,
+      });
+    },
+    onError: (error) => {
+      // Log error for user feedback
+      console.error('Failed to add card to deck:', error.message);
+    },
+    onSettled: async () => {
+      // Always invalidate deck queries to ensure consistency
+      await utils.decks.get.invalidate({ deckId });
+      await utils.decks.analyze.invalidate({ deckId });
+    },
+  });
+
+  const handleAddToDeck = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click event
+    addCardMutation.mutate({
+      deckId,
+      cardId: card.id,
+      quantity: 1,
+      cardType: 'mainboard',
+    });
+  };
 
   return (
     <Card
@@ -138,6 +177,26 @@ function SuggestionCard({
               )}
             </div>
           </div>
+
+          {/* Add to Deck Button */}
+          <Button
+            onClick={handleAddToDeck}
+            disabled={addCardMutation.isPending}
+            className="w-full mt-2 gap-2"
+            size="sm"
+          >
+            {addCardMutation.isPending ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="w-3 h-3" />
+                Add to Deck
+              </>
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -268,6 +327,9 @@ export function RecommendationPanel({
             <SuggestionCard
               key={suggestion.card.id}
               suggestion={suggestion}
+              deckId={deckId}
+              collectionId={collectionId}
+              format={format}
               onCardClick={onCardClick}
             />
           ))}

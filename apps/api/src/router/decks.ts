@@ -390,7 +390,75 @@ export const decksRouter = router({
         }
       }
 
-      // Check if card is already in deck
+      // If adding a commander, use a transaction to ensure atomicity
+      // (only one commander is supported currently)
+      if (input.cardType === 'commander') {
+        console.log('[addCard] Adding commander with transaction');
+
+        const { data: result, error: transactionError } = await handlePromise(
+          db.transaction(async (tx) => {
+            // Soft delete all existing commanders
+            await tx
+              .update(deckCards)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  eq(deckCards.deckId, input.deckId),
+                  eq(deckCards.cardType, 'commander'),
+                  isNull(deckCards.deletedAt)
+                )
+              );
+
+            // Check if this specific card already exists (may be soft-deleted)
+            const existingDeckCard = await tx.query.deckCards.findFirst({
+              where: and(
+                eq(deckCards.deckId, input.deckId),
+                eq(deckCards.cardId, input.cardId),
+                eq(deckCards.cardType, 'commander'),
+                isNull(deckCards.deletedAt)
+              ),
+            });
+
+            if (existingDeckCard) {
+              // Update existing card
+              const [updated] = await tx
+                .update(deckCards)
+                .set({
+                  quantity: input.quantity,
+                  updatedAt: new Date(),
+                })
+                .where(eq(deckCards.id, existingDeckCard.id))
+                .returning();
+              return updated;
+            } else {
+              // Insert new commander
+              const [inserted] = await tx
+                .insert(deckCards)
+                .values({
+                  deckId: input.deckId,
+                  cardId: input.cardId,
+                  quantity: input.quantity,
+                  cardType: input.cardType
+                })
+                .returning();
+              return inserted;
+            }
+          })
+        );
+
+        if (transactionError) {
+          console.error('[addCard] Failed to replace commander:', transactionError);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to replace commander',
+          });
+        }
+
+        console.log('[addCard] Successfully replaced commander');
+        return result;
+      }
+
+      // For non-commander cards, use existing logic
       console.log('[addCard] Checking if card already in deck');
       const { data: existingDeckCard, error: existingCardError } = await handlePromise(
         db.query.deckCards.findFirst({
