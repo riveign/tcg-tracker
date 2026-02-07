@@ -13,7 +13,7 @@ interface AuthState {
 // Zustand store for auth state with localStorage persistence
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       token: null,
       user: null,
       isAuthenticated: false,

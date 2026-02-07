@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Loader2 } from 'lucide-react';
 import { trpc } from '../lib/trpc';
 import { Button } from '../components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { DeckDialog } from '../components/decks/DeckDialog';
 import { useNavigate } from 'react-router-dom';
 
