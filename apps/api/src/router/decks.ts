@@ -390,6 +390,55 @@ export const decksRouter = router({
         }
       }
 
+      // If adding a commander, remove any existing commanders first
+      // (only one commander is supported currently)
+      if (input.cardType === 'commander') {
+        console.log('[addCard] Adding commander, checking for existing commanders to remove');
+        const { data: existingCommanders, error: commanderFetchError } = await handlePromise(
+          db.query.deckCards.findMany({
+            where: and(
+              eq(deckCards.deckId, input.deckId),
+              eq(deckCards.cardType, 'commander'),
+              isNull(deckCards.deletedAt)
+            ),
+          })
+        );
+
+        if (commanderFetchError) {
+          console.error('[addCard] Failed to check existing commanders:', commanderFetchError);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to check existing commanders',
+          });
+        }
+
+        // Remove all existing commanders (soft delete)
+        if (existingCommanders && existingCommanders.length > 0) {
+          console.log('[addCard] Removing existing commanders:', existingCommanders.length);
+          const { error: deleteError } = await handlePromise(
+            db
+              .update(deckCards)
+              .set({ deletedAt: new Date() })
+              .where(
+                and(
+                  eq(deckCards.deckId, input.deckId),
+                  eq(deckCards.cardType, 'commander'),
+                  isNull(deckCards.deletedAt)
+                )
+              )
+          );
+
+          if (deleteError) {
+            console.error('[addCard] Failed to remove existing commanders:', deleteError);
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to remove existing commander',
+            });
+          }
+          console.log('[addCard] Successfully removed existing commanders');
+        }
+      }
+
       // Check if card is already in deck
       console.log('[addCard] Checking if card already in deck');
       const { data: existingDeckCard, error: existingCardError } = await handlePromise(
