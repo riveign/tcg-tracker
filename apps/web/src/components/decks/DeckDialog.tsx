@@ -222,22 +222,18 @@ export const DeckDialog = ({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
-    // Prevent Enter key from submitting form during multi-step flow
-    if (e.key === 'Enter' && !isEditing && currentStep < TOTAL_STEPS) {
-      // Don't prevent if target is a button or select
+    // Prevent ALL Enter key form submissions during multi-step flow
+    // Users must explicitly click Next/Submit buttons
+    if (e.key === 'Enter' && !isEditing) {
       const target = e.target as HTMLElement
-      if (target.tagName === 'BUTTON' || target.getAttribute('role') === 'combobox') {
+
+      // Allow Enter on buttons (they handle their own click events)
+      if (target.tagName === 'BUTTON') {
         return
       }
 
+      // Prevent Enter from submitting the form in all other cases
       e.preventDefault()
-      // Advance to next step if current step is valid
-      if (
-        (currentStep === 1 && canAdvanceFromStep1) ||
-        (currentStep === 2 && canAdvanceFromStep2)
-      ) {
-        handleNext()
-      }
     }
   }
 
