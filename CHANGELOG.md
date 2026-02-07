@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Commander Selection and Deck Creation API (2026-02-07)
+
+**Commander Selection Component:**
+- Created `CommanderSelector` component for selecting legendary creatures as commanders
+- Integrated with existing `CardSearch` component for unified search experience
+- Added color identity display with WUBRG mana color badges
+- Implemented commander validation (legendary creatures and special planeswalkers)
+- Added visual preview with card image, type line, and color identity
+- Supports removing commanders with dedicated "Remove Commander" action
+- Future-proof design supports partner commanders (single commander implemented)
+
+**Deck Creation API Enhancements:**
+- Added `commanderId`, `colors`, and `strategy` fields to deck creation endpoint
+- Extended `createDeckSchema` and `updateDeckSchema` with new metadata fields
+- Implemented `canBeCommander()` validation function for legendary creature checks
+- Auto-extracts color identity from commander card when colors not explicitly provided
+- Added validation for commander card existence and legendary status
+- Throws user-friendly error messages for invalid commander selections
+- Maintains full backward compatibility with existing deck creation flows
+
+**Type System Extensions:**
+- Added `color_identity` field to `ScryfallCard` interface
+- Created color enum for WUBRG validation (`W`, `U`, `B`, `R`, `G`)
+- Strategy field accepts up to 50-character strings for format-specific archetypes
+
+**Testing:**
+- Added 13 unit tests for deck schema validation and commander logic
+- Tests cover valid/invalid commander scenarios, color validation, and backward compatibility
+- All 151 API tests passing (100% pass rate)
+
 #### Foundation Schema and Type System (2026-02-07)
 
 **Database Schema Extensions:**
