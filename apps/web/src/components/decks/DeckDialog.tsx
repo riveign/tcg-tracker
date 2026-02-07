@@ -217,6 +217,20 @@ export const DeckDialog = ({
     onOpenChange(false)
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    // Prevent Enter key from submitting form during multi-step flow
+    if (e.key === 'Enter' && !isEditing && currentStep < TOTAL_STEPS) {
+      e.preventDefault()
+      // Optionally advance to next step if current step is valid
+      if (
+        (currentStep === 1 && canAdvanceFromStep1) ||
+        (currentStep === 2 && canAdvanceFromStep2)
+      ) {
+        handleNext()
+      }
+    }
+  }
+
   // Step indicator component
   const StepIndicator = () => (
     <div className="flex items-center justify-center gap-2 mb-4">
@@ -275,7 +289,7 @@ export const DeckDialog = ({
         {!isEditing && <StepIndicator />}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
             {/* Step 1: Basic Info */}
             {(currentStep === 1 || isEditing) && (
               <>
