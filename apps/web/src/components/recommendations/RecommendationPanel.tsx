@@ -67,16 +67,23 @@ function SuggestionCard({
 
   const utils = trpc.useUtils();
   const addCardMutation = trpc.decks.addCard.useMutation({
-    onSettled: async () => {
-      // Invalidate deck queries to refresh
-      await utils.decks.get.invalidate({ deckId });
-      await utils.decks.analyze.invalidate({ deckId });
+    onSuccess: async () => {
       // Invalidate recommendations to remove the added card from suggestions
+      // Only on success - no need to refetch if nothing changed
       await utils.recommendations.getSuggestions.invalidate({
         deckId,
         collectionId,
         format,
       });
+    },
+    onError: (error) => {
+      // Log error for user feedback
+      console.error('Failed to add card to deck:', error.message);
+    },
+    onSettled: async () => {
+      // Always invalidate deck queries to ensure consistency
+      await utils.decks.get.invalidate({ deckId });
+      await utils.decks.analyze.invalidate({ deckId });
     },
   });
 

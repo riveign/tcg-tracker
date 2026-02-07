@@ -166,9 +166,7 @@ export function DeckDetail() {
               variant="outline"
               size="sm"
               onClick={() => {
-                setActiveTab('mainboard'); // Set tab for dialog context
                 setIsSearchOpen(true);
-                // Override cardType to commander via state
                 setCommanderSearchMode(true);
               }}
               className="gap-2"
