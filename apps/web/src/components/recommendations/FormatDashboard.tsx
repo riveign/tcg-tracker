@@ -52,7 +52,6 @@ function isAllFormatsCoverage(
  * Format summary card for the overview grid
  */
 function FormatSummaryCard({
-  _format,
   label,
   color,
   totalLegalCards,
@@ -61,7 +60,6 @@ function FormatSummaryCard({
   isSelected,
   onClick,
 }: {
-  _format: FormatType;
   label: string;
   color: string;
   totalLegalCards: number;
@@ -109,10 +107,10 @@ function FormatSummaryCard({
  */
 function FormatDetailView({
   collectionId,
-  _format,
+  format,
 }: {
   collectionId: string;
-  _format: FormatType;
+  format: FormatType;
 }) {
   const { data, isLoading, error } = useBuildableDecks(
     { collectionId, format, limit: 10 },
@@ -266,7 +264,6 @@ export function FormatDashboard({
           return (
             <FormatSummaryCard
               key={value}
-              format={value}
               label={label}
               color={color}
               totalLegalCards={formatData.totalLegalCards}
