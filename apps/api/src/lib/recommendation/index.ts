@@ -54,3 +54,30 @@ export type { CollectionServiceError, CollectionServiceResult } from './collecti
 
 // Synergy Scorer
 export { SynergyScorer } from './synergy-scorer.js';
+
+// Buildable Decks Analyzer
+export { BuildableDecksAnalyzer } from './buildable-decks.js';
+export type {
+  DeckTemplate,
+  DeckTemplateCard,
+  BuildableAnalysis,
+} from './buildable-decks.js';
+
+// Progressive Updates
+export { ProgressiveUpdates } from './progressive-updates.js';
+export type {
+  CollectionChangeEvent,
+  DeckImpactAnalysis,
+  CategoryImprovement,
+  ProgressiveNotification,
+  ArchetypeUnlocked,
+  DeckBuildable,
+} from './progressive-updates.js';
+
+// Cache
+export { RecommendationCache } from './cache.js';
+export type {
+  CacheEntry,
+  CacheStrategy,
+  CacheStats,
+} from './cache.js';

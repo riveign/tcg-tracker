@@ -14,7 +14,6 @@ import type {
   CollectionCard,
   FormatCoverage,
   ViableArchetype,
-  BuildableDeck,
   ManaColor,
 } from './format-adapters/index.js';
 import { FormatAdapterFactory } from './format-adapters/index.js';
@@ -147,6 +146,13 @@ export class CollectionService {
     collectionId: string,
     format: FormatType
   ): Promise<CollectionServiceResult<FormatCoverage>> {
+    // Check cache first
+    const { RecommendationCache } = await import('./cache.js');
+    const cached = RecommendationCache.getFormatCoverage(collectionId, format);
+    if (cached) {
+      return { data: cached, error: null };
+    }
+
     const { data: legalCards, error } = await CollectionService.getCardsForFormat(
       collectionId,
       format
@@ -159,16 +165,22 @@ export class CollectionService {
     // Analyze viable archetypes based on card pool
     const viableArchetypes = CollectionService.analyzeViableArchetypes(legalCards, format);
 
-    // Analyze buildable decks
-    const buildableDecks = CollectionService.analyzeBuildableDecks(legalCards, format);
+    // Analyze buildable decks using the new analyzer
+    const { BuildableDecksAnalyzer } = await import('./buildable-decks.js');
+    const buildableDecks = BuildableDecksAnalyzer.analyzeBuildableDecks(legalCards, format);
+
+    const coverage: FormatCoverage = {
+      format,
+      totalLegalCards: legalCards.length,
+      viableArchetypes,
+      buildableDecks,
+    };
+
+    // Cache the result
+    RecommendationCache.setFormatCoverage(collectionId, format, coverage);
 
     return {
-      data: {
-        format,
-        totalLegalCards: legalCards.length,
-        viableArchetypes,
-        buildableDecks,
-      },
+      data: coverage,
       error: null,
     };
   }
@@ -329,78 +341,4 @@ export class CollectionService {
     return archetypes.sort((a, b) => b.completeness - a.completeness);
   }
 
-  /**
-   * Analyze which specific decks can be built from the card pool
-   */
-  private static analyzeBuildableDecks(
-    cards: CollectionCard[],
-    format: FormatType
-  ): BuildableDeck[] {
-    const buildableDecks: BuildableDeck[] = [];
-    // Note: adapter will be used in Phase 3 for more sophisticated deck matching
-    // const adapter = FormatAdapterFactory.create(format);
-
-    // For Phase 1, we do a simple analysis based on available cards
-    // In Phase 3, this will be enhanced with meta deck templates
-
-    // Count cards by color
-    const colorCounts: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-    for (const cc of cards) {
-      const colors = cc.card.colors ?? [];
-      for (const color of colors) {
-        const existingCount = colorCounts[color];
-        if (existingCount !== undefined) {
-          colorCounts[color] = existingCount + cc.quantity;
-        }
-      }
-    }
-
-    // Find the dominant colors
-    const sortedColors = Object.entries(colorCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 2);
-
-    const firstColor = sortedColors[0];
-    if (sortedColors.length > 0 && firstColor && firstColor[1] > 10) {
-      const primaryColor = firstColor[0];
-      const deckName = CollectionService.getArchetypeForColor(primaryColor, format);
-
-      const coreCards = cards
-        .filter((cc) => cc.card.colors?.includes(primaryColor))
-        .slice(0, 5)
-        .map((cc) => cc.card.name);
-
-      const totalNeeded = format === 'commander' ? 99 : 60;
-      const cardsAvailable = cards.filter((cc) =>
-        cc.card.colors?.includes(primaryColor) || (cc.card.colors?.length ?? 0) === 0
-      ).length;
-
-      const completeness = Math.min(100, Math.round((cardsAvailable / totalNeeded) * 100));
-
-      buildableDecks.push({
-        archetype: deckName,
-        completeness,
-        coreCardsOwned: coreCards,
-        missingCount: Math.max(0, totalNeeded - cardsAvailable),
-        missingKeyCards: [], // Will be enhanced in Phase 3
-      });
-    }
-
-    return buildableDecks;
-  }
-
-  /**
-   * Get archetype name for a color
-   */
-  private static getArchetypeForColor(color: string, _format: FormatType): string {
-    const colorNames: Record<string, string> = {
-      W: 'White Weenie',
-      U: 'Blue Control',
-      B: 'Black Aggro',
-      R: 'Red Burn',
-      G: 'Green Stompy',
-    };
-
-    return colorNames[color] ?? 'Unknown';
-  }
 }

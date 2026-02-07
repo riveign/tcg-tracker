@@ -62,6 +62,11 @@ const getGapsSchema = z.object({
   format: formatEnum,
 });
 
+const getMultiFormatComparisonSchema = z.object({
+  collectionId: z.string().uuid(), // REQUIRED
+  deckIds: z.array(z.string().uuid()).min(1).max(10),
+});
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -353,6 +358,82 @@ function detectArchetype(
   return 'unknown';
 }
 
+async function checkDeckViability(
+  deck: DeckWithCards,
+  collectionId: string,
+  adapter: ReturnType<typeof FormatAdapterFactory.create>,
+  userId: string
+): Promise<boolean> {
+  // Check if all cards in deck are legal in this format
+  for (const deckCard of deck.cards) {
+    if (!adapter.isLegal(deckCard.card) || adapter.isBanned(deckCard.card)) {
+      return false;
+    }
+  }
+
+  // Check format-specific constraints
+  const validation = adapter.validateDeck(deck);
+  if (!validation.valid) {
+    return false;
+  }
+
+  // Check if user owns enough cards to build this deck in this format
+  const { data: collectionCards, error } = await CollectionService.getCardsForFormat(
+    collectionId,
+    adapter.format
+  );
+
+  if (error || !collectionCards) {
+    return false;
+  }
+
+  // Count how many deck cards the user owns
+  const ownedCardIds = new Set(collectionCards.map((cc) => cc.card.id));
+  const deckCardIds = deck.cards.map((dc) => dc.cardId);
+  const ownedCount = deckCardIds.filter((id) => ownedCardIds.has(id)).length;
+
+  // Viable if user owns at least 80% of the deck
+  return ownedCount >= deckCardIds.length * 0.8;
+}
+
+async function calculateDeckCompleteness(
+  deck: DeckWithCards,
+  collectionId: string,
+  adapter: ReturnType<typeof FormatAdapterFactory.create>,
+  userId: string
+): Promise<number> {
+  const { data: collectionCards, error } = await CollectionService.getCardsForFormat(
+    collectionId,
+    adapter.format
+  );
+
+  if (error || !collectionCards) {
+    return 0;
+  }
+
+  // Create a map of owned cards by ID with quantities
+  const ownedCardMap = new Map<string, number>();
+  for (const cc of collectionCards) {
+    ownedCardMap.set(cc.card.id, cc.quantity);
+  }
+
+  // Calculate how many cards from deck are owned
+  let totalNeeded = 0;
+  let totalOwned = 0;
+
+  for (const deckCard of deck.cards) {
+    if (deckCard.cardType !== 'mainboard') continue;
+
+    totalNeeded += deckCard.quantity;
+    const ownedQuantity = ownedCardMap.get(deckCard.cardId) ?? 0;
+    totalOwned += Math.min(deckCard.quantity, ownedQuantity);
+  }
+
+  if (totalNeeded === 0) return 0;
+
+  return Math.round((totalOwned / totalNeeded) * 100);
+}
+
 // =============================================================================
 // Router Definition
 // =============================================================================
@@ -559,4 +640,53 @@ export const recommendationsRouter = router({
 
     return analyzeGaps(deck, adapter);
   }),
+
+  /**
+   * Compare deck viability across formats
+   */
+  getMultiFormatComparison: protectedProcedure
+    .input(getMultiFormatComparisonSchema)
+    .query(async ({ input, ctx }) => {
+      const { collectionId, deckIds } = input;
+
+      await verifyCollectionOwnership(collectionId, ctx.user.userId);
+
+      const results = await Promise.all(
+        deckIds.map(async (deckId) => {
+          const deck = await loadDeckWithCards(deckId, ctx.user.userId);
+          const formats: FormatType[] = ['standard', 'modern', 'commander', 'brawl'];
+
+          const viability = await Promise.all(
+            formats.map(async (format) => {
+              const adapter = FormatAdapterFactory.create(format);
+
+              // Check if deck is viable in this format
+              const isViable = await checkDeckViability(deck, collectionId, adapter, ctx.user.userId);
+
+              // Calculate completeness
+              const completeness = await calculateDeckCompleteness(
+                deck,
+                collectionId,
+                adapter,
+                ctx.user.userId
+              );
+
+              return {
+                format,
+                isViable,
+                completeness,
+              };
+            })
+          );
+
+          return {
+            deckId,
+            deckName: deck.name,
+            viability,
+          };
+        })
+      );
+
+      return { comparisons: results };
+    }),
 });
