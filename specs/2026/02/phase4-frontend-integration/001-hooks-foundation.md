@@ -761,3 +761,42 @@ function DeckRecommendations({ deckId, collectionId }: Props) {
 - [x] Hooks are exported from the file for use in components (19 exports verified)
 
 **Status: All acceptance criteria met ✅**
+
+## Updated Doc
+
+### Documentation Changes
+
+**File: `/home/mantis/Development/tcg-tracker/README.md`**
+
+Updated 4 sections to reflect the new recommendation system:
+
+1. **Project Structure (L113-144):**
+   - Added `useRecommendations.ts` to frontend hooks directory
+   - Added `recommendations.ts` router to backend
+   - Added `recommendation/` library to backend
+
+2. **Project Status (L76-99):**
+   - Updated current phase to "Deck Recommendation System (Phase 4)"
+   - Added completed items: backend system (Phase 1-3) and React Query hooks (Phase 4.1)
+   - Added in-progress Phase 4 frontend components
+
+3. **Implemented Features (L145-175):**
+   - Added "Deck Recommendation System (Backend)" section
+   - Listed 7 completed backend features (multi-format suggestions, buildable decks, format coverage, multi-format comparison, archetype detection, gap analysis, React Query hooks)
+
+4. **Planned Features (L177-191):**
+   - Added "Phase 4 - Frontend Integration" section with 6 UI components planned
+   - Preserved existing planned features (deck builder, statistics)
+
+### Code Documentation
+
+**File: `/home/mantis/Development/tcg-tracker/apps/web/src/hooks/useRecommendations.ts`**
+
+All code documentation is inline via JSDoc comments:
+- File-level documentation (L1-6)
+- Type inference section headers (L12-14)
+- Cache configuration section (L35-37)
+- Hook function JSDoc comments with parameters and return types (L52-151)
+- Cache invalidation utilities documentation (L154-164)
+
+No additional documentation files needed - hooks are self-documenting with comprehensive inline comments.
