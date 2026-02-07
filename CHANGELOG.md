@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Multi-Step Deck Creation Wizard (2026-02-07)
+
+**DeckDialog Multi-Step Wizard:**
+- Refactored `DeckDialog` component into a 3-step wizard for deck creation
+- Step 1: Basic information (name, description, format selection)
+- Step 2: Format-specific metadata (Commander selection OR color/strategy)
+- Step 3: Collection settings with summary review
+- Added step indicator navigation with visual progress tracking
+- Implemented back/next buttons with smart validation
+- Step validation prevents advancing with incomplete required fields
+- Form state persists across steps using react-hook-form
+- Single-page layout maintained for edit mode (backward compatible)
+
+**ColorPicker Component:**
+- Created reusable color picker component for WUBRG color selection
+- Visual mana color buttons with accurate Magic color scheme
+- Interactive toggle buttons with ring indicators for selected colors
+- Color identity feedback (mono-color, two-color, etc.)
+- `ColorIdentityDisplay` component for read-only color badge display
+- Supports disabled and read-only states
+- Accessible ARIA labels and button states
+
+**CommanderDeckForm Component:**
+- Format-specific form for Commander decks (Step 2)
+- Integrates `CommanderSelector` component for legendary creature selection
+- Displays selected commander with card image and color identity
+- Auto-extracts color identity from selected commander
+- 12 Commander-specific strategies (Voltron, Stax, Aristocrats, Tribal, etc.)
+- Strategy dropdown with descriptive labels
+- Edit button to change selected commander
+
+**ConstructedDeckForm Component:**
+- Format-specific form for Constructed decks (Step 2)
+- Uses `ColorPicker` for manual color selection
+- 10 Constructed-specific strategies (Aggro, Control, Midrange, Tempo, etc.)
+- Strategy dropdown optimized for 60-card formats
+
+**User Experience Improvements:**
+- Format selection determines which form appears in Step 2
+- Summary view on Step 3 shows all selected metadata before creation
+- Cancel button always available to close wizard
+- Back button available on Steps 2-3 to revise previous choices
+- Next button disabled until required fields are complete
+- Create button only appears on final step
+- Wizard resets to Step 1 when dialog closes
+
 #### Commander Selection and Deck Creation API (2026-02-07)
 
 **Commander Selection Component:**
