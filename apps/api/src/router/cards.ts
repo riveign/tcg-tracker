@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../lib/trpc.js';
 import { db, cards } from '@tcg-tracker/db';
 import { eq } from 'drizzle-orm';
-import { searchCards, getCardById, transformScryfallCard } from '../lib/scryfall.js';
+import { searchCards, getCardById, transformScryfallCard, parseSetCodeQuery, searchBySetCode } from '../lib/scryfall.js';
 
 const searchCardsSchema = z.object({
   query: z.string().min(1, 'Search query is required'),
@@ -31,12 +31,37 @@ const advancedSearchSchema = z.object({
 export const cardsRouter = router({
   /**
    * Search for cards using Scryfall API
+   * Supports both name search and set code + collector number (e.g., "ECL #212")
    */
   search: protectedProcedure
     .input(searchCardsSchema)
     .query(async ({ input }) => {
       const { query, page } = input;
 
+      // Check if query matches set code pattern (e.g., "ECL #212", "ECL 212", "ecl#212", "ECL-212")
+      const setCodeMatch = parseSetCodeQuery(query);
+
+      if (setCodeMatch) {
+        // Search by set code and collector number using Scryfall's direct endpoint
+        const card = await searchBySetCode(setCodeMatch.setCode, setCodeMatch.collectorNumber);
+
+        if (card) {
+          return {
+            cards: [card],
+            hasMore: false,
+            total: 1,
+          };
+        }
+
+        // If no card found, return empty results
+        return {
+          cards: [],
+          hasMore: false,
+          total: 0,
+        };
+      }
+
+      // Default: search by name
       const { cards: scryfallCards, hasMore, total } = await searchCards(query, page);
 
       // Return the Scryfall cards directly - we'll cache them when adding to collection

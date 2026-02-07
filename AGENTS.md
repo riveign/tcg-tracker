@@ -1,14 +1,15 @@
 # Project Guidelines
 
 ## Environment & Tooling
-- **Package Manager:** pnpm
-- **Type Checking:** tsc --noEmit (never tsc alone)
-- **Linting:** eslint <path> [--fix]
-- **Build:** Only when explicitly requested
+- **Package Manager:** bun (NEVER use npm or pnpm)
+- **Type Checking:** bun run type-check (runs tsc --noEmit across workspaces)
+- **Linting:** bun run lint (runs eslint across workspaces)
+- **Build:** Only when explicitly requested (use: bun run build)
+- **Dev Server:** bun run dev (starts all services) or bun run dev:web / bun run dev:api
 
 ## Style & Conventions
 - TypeScript strict mode, functional components, explicit types (no any)
-- After edits: eslint --fix <file> && tsc --noEmit
+- After edits: bun run lint && bun run type-check
 
 ## Core Principles
 - Verify over assume

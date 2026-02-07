@@ -99,6 +99,45 @@ export async function getCardById(cardId: string): Promise<ScryfallCard | null> 
 }
 
 /**
+ * Parse set code and collector number from search query
+ * Supports formats: ECL #212, ECL 212, ecl#212, ECL-212
+ */
+export function parseSetCodeQuery(query: string): { setCode: string; collectorNumber: string } | null {
+  const pattern = /^([a-z0-9]+)\s*[#\s-]\s*(\d+[a-z]?)$/i;
+  const match = query.trim().match(pattern);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    setCode: match[1].toUpperCase(),
+    collectorNumber: match[2],
+  };
+}
+
+/**
+ * Search for a specific card by set code and collector number
+ */
+export async function searchBySetCode(
+  setCode: string,
+  collectorNumber: string
+): Promise<ScryfallCard | null> {
+  const url = `${SCRYFALL_API_BASE}/cards/${setCode}/${collectorNumber}`;
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
+    }
+    throw new Error(`Scryfall API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Transform Scryfall card data to our database schema
  */
 export function transformScryfallCard(scryfallCard: ScryfallCard) {
