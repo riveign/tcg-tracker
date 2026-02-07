@@ -143,6 +143,21 @@ export class ModernAdapter implements FormatAdapter {
   // Legality Checks
   // ===========================================================================
 
+  /**
+   * Type guard to safely validate gameData structure
+   */
+  private static isLegalitiesRecord(
+    data: unknown
+  ): data is { legalities: Record<string, string> } {
+    if (!data || typeof data !== 'object') return false;
+    const obj = data as Record<string, unknown>;
+    return (
+      'legalities' in obj &&
+      typeof obj.legalities === 'object' &&
+      obj.legalities !== null
+    );
+  }
+
   isLegal(card: Card): boolean {
     const status = this.getLegalityStatus(card);
     return status === 'legal' || status === 'restricted';
@@ -154,13 +169,11 @@ export class ModernAdapter implements FormatAdapter {
   }
 
   getLegalityStatus(card: Card): LegalityStatus {
-    const gameData = card.gameData as Record<string, unknown> | null;
-    if (!gameData) return 'not_legal';
+    if (!ModernAdapter.isLegalitiesRecord(card.gameData)) {
+      return 'not_legal';
+    }
 
-    const legalities = gameData.legalities as Record<string, string> | undefined;
-    if (!legalities) return 'not_legal';
-
-    const status = legalities.modern;
+    const status = card.gameData.legalities.modern;
     if (!status) return 'not_legal';
 
     switch (status) {

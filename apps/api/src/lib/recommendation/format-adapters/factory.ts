@@ -16,7 +16,19 @@ import { BrawlAdapter } from './brawl.js';
 // Adapter Cache
 // =============================================================================
 
-// Cache adapters to avoid repeated instantiation
+/**
+ * Module-level cache for format adapters.
+ *
+ * This cache is safe because:
+ * 1. **Bounded size**: Only 4 formats exist (standard, modern, commander, brawl)
+ * 2. **Stateless adapters**: Adapters contain no request-scoped data
+ * 3. **Immutable**: Adapters are created once and never modified
+ * 4. **Test support**: clearCache() provided for test isolation
+ *
+ * Memory impact: ~4KB (one adapter instance per format)
+ *
+ * @internal
+ */
 const adapterCache = new Map<FormatType, FormatAdapter>();
 
 // =============================================================================

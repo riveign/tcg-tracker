@@ -146,11 +146,17 @@ export class CollectionService {
     collectionId: string,
     format: FormatType
   ): Promise<CollectionServiceResult<FormatCoverage>> {
-    // Check cache first
-    const { RecommendationCache } = await import('./cache.js');
-    const cached = RecommendationCache.getFormatCoverage(collectionId, format);
-    if (cached) {
-      return { data: cached, error: null };
+    // Try to use cache, but proceed without it if unavailable
+    let cachedResult: FormatCoverage | null = null;
+    try {
+      const { RecommendationCache } = await import('./cache.js');
+      cachedResult = RecommendationCache.getFormatCoverage(collectionId, format);
+      if (cachedResult) {
+        return { data: cachedResult, error: null };
+      }
+    } catch (error) {
+      // Cache module unavailable - proceed with direct computation
+      // This is not a fatal error, we can compute coverage without caching
     }
 
     const { data: legalCards, error } = await CollectionService.getCardsForFormat(
@@ -165,9 +171,16 @@ export class CollectionService {
     // Analyze viable archetypes based on card pool
     const viableArchetypes = CollectionService.analyzeViableArchetypes(legalCards, format);
 
-    // Analyze buildable decks using the new analyzer
-    const { BuildableDecksAnalyzer } = await import('./buildable-decks.js');
-    const buildableDecks = BuildableDecksAnalyzer.analyzeBuildableDecks(legalCards, format);
+    // Try to use buildable decks analyzer, fall back to empty array if unavailable
+    let buildableDecks: FormatCoverage['buildableDecks'] = [];
+    try {
+      const { BuildableDecksAnalyzer } = await import('./buildable-decks.js');
+      buildableDecks = BuildableDecksAnalyzer.analyzeBuildableDecks(legalCards, format);
+    } catch (error) {
+      // Buildable decks analyzer unavailable - use empty array
+      // This gracefully degrades functionality without breaking the API
+      buildableDecks = [];
+    }
 
     const coverage: FormatCoverage = {
       format,
@@ -176,8 +189,14 @@ export class CollectionService {
       buildableDecks,
     };
 
-    // Cache the result
-    RecommendationCache.setFormatCoverage(collectionId, format, coverage);
+    // Try to cache the result, but don't fail if caching is unavailable
+    try {
+      const { RecommendationCache } = await import('./cache.js');
+      RecommendationCache.setFormatCoverage(collectionId, format, coverage);
+    } catch (error) {
+      // Cache module unavailable - skip caching
+      // Not a fatal error, we can return the result without caching
+    }
 
     return {
       data: coverage,
