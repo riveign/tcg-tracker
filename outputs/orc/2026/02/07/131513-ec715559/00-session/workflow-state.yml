@@ -1,0 +1,20 @@
+session_id: "131513-ec715559"
+command: "orc"
+started_at: "2026-02-07T13:15:13Z"
+updated_at: "2026-02-07T13:15:13Z"
+status: "in_progress"
+
+current_step: 1
+current_step_status: "in_progress"
+
+steps:
+  - step: 1
+    name: "Update Product Vision"
+    status: "in_progress"
+    started_at: "2026-02-07T13:15:13Z"
+    completed_at: null
+
+error_context: null
+resume_instruction: "Resume with: /orc resume"
+
+task_description: "Update Product Vision - Multi-Format Collection-First Deck Builder"
