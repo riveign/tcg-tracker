@@ -35,17 +35,27 @@ export interface FormatDashboardProps {
 }
 
 /**
- * Type guard for all-formats coverage response
+ * All-formats coverage response structure
  */
-function isAllFormatsCoverage(
-  data: FormatCoverageOutput
-): data is {
+interface AllFormatsCoverage {
   standard: { format: string; totalLegalCards: number; viableArchetypes: ViableArchetype[]; buildableDecks: BuildableDeck[] };
   modern: { format: string; totalLegalCards: number; viableArchetypes: ViableArchetype[]; buildableDecks: BuildableDeck[] };
   commander: { format: string; totalLegalCards: number; viableArchetypes: ViableArchetype[]; buildableDecks: BuildableDeck[] };
   brawl: { format: string; totalLegalCards: number; viableArchetypes: ViableArchetype[]; buildableDecks: BuildableDeck[] };
-} {
-  return 'standard' in data && 'modern' in data && 'commander' in data && 'brawl' in data;
+}
+
+/**
+ * Check if data contains all format keys (multi-format response)
+ */
+function hasAllFormats(data: FormatCoverageOutput): boolean {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'standard' in data &&
+    'modern' in data &&
+    'commander' in data &&
+    'brawl' in data
+  );
 }
 
 /**
@@ -247,7 +257,7 @@ export function FormatDashboard({
   }
 
   // Check for all-formats response
-  if (!coverageData || !isAllFormatsCoverage(coverageData)) {
+  if (!coverageData || !hasAllFormats(coverageData)) {
     return (
       <div className={cn('text-center py-8', className)}>
         <p className="text-text-secondary text-sm">No coverage data available</p>
@@ -255,12 +265,15 @@ export function FormatDashboard({
     );
   }
 
+  // Type assertion after runtime check
+  const allCoverage = coverageData as AllFormatsCoverage;
+
   return (
     <div className={cn('space-y-6', className)}>
       {/* Format Overview Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {FORMATS.map(({ value, label, color }) => {
-          const formatData = coverageData[value];
+          const formatData = allCoverage[value];
           return (
             <FormatSummaryCard
               key={value}
