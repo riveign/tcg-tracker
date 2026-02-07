@@ -203,7 +203,11 @@ export const DeckDialog = ({
     }
   }
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    // Ensure this doesn't trigger form submission
+    e?.preventDefault()
+    e?.stopPropagation()
+
     if (currentStep < TOTAL_STEPS) {
       setCurrentStep((prev) => (prev + 1) as Step)
     }
@@ -293,7 +297,19 @@ export const DeckDialog = ({
         {!isEditing && <StepIndicator />}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              // Only allow submission on final step
+              if (!isEditing && currentStep < TOTAL_STEPS) {
+                e.preventDefault()
+                e.stopPropagation()
+                return false
+              }
+              form.handleSubmit(onSubmit)(e)
+            }}
+            onKeyDown={handleKeyDown}
+            className="space-y-4"
+          >
             {/* Step 1: Basic Info + Collection Settings */}
             {(currentStep === 1 || isEditing) && (
               <>
