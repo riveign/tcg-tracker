@@ -1264,3 +1264,56 @@ The implementation is well-structured with appropriate separation of concerns:
 - Fallback logic ensures legacy deck compatibility
 - Strategy-specific scoring enhances recommendations without breaking existing behavior
 - Test coverage is adequate for Phase 6 scope
+
+## Implementation
+
+**Status**: ✅ Complete
+
+**Date**: 2026-02-07
+
+**Commit**: b3658b6
+
+### Summary
+
+Successfully implemented recommendation engine integration with metadata-aware scoring. All acceptance criteria met with comprehensive test coverage.
+
+### Changes
+
+1. **Type System**: Extended DeckWithCards and ScoringContext with metadata fields
+2. **CommanderAdapter**: Color constraint priority system + 4 new strategy modifiers (stax, lands, artifacts, enchantments)
+3. **StandardAdapter**: Color preference method + 4 new strategy modifiers (tempo, ramp, burn, mill)
+4. **ArchetypeDetector**: getEffectiveArchetype() method for strategy-first archetype selection
+5. **SynergyScorer**: Strategy-specific keyword boosts (3-4 points per match)
+6. **Recommendations Router**: Metadata loading and strategy integration
+7. **Tests**: 21 comprehensive unit tests covering all Phase 6 features
+
+### Verification
+
+- ✅ Lint: All checks passed
+- ✅ Type-check: All checks passed
+- ✅ Unit tests: 21/21 passed (33 assertions)
+- ✅ Backward compatibility: Legacy decks work as before
+- ✅ Performance: No additional database queries
+
+### Files Modified
+
+- `apps/api/src/lib/recommendation/format-adapters/types.ts`
+- `apps/api/src/lib/recommendation/format-adapters/commander.ts`
+- `apps/api/src/lib/recommendation/format-adapters/standard.ts`
+- `apps/api/src/lib/recommendation/synergy-scorer.ts`
+- `apps/api/src/lib/recommendation/archetype-detector.ts`
+- `apps/api/src/router/recommendations.ts`
+- `apps/api/src/lib/recommendation/__tests__/format-adapters-phase6.test.ts` (NEW)
+
+**Total**: 7 files changed, 646 insertions(+), 4 deletions(-)
+
+### Acceptance Criteria Validation
+
+| Criterion | Status |
+|-----------|--------|
+| Commander decks get recommendations matching color identity | ✅ |
+| Strategy influences recommendation weights | ✅ |
+| Constructed decks respect selected colors | ✅ |
+| Legacy decks without metadata still get recommendations | ✅ |
+| Recommendations return within 2 seconds | ✅ |
+| Type checking and lint pass | ✅ |
