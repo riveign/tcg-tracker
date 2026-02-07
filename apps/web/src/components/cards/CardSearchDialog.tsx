@@ -52,14 +52,11 @@ export const CardSearchDialog = ({
   const addCardToDeckMutation = trpc.decks.addCard.useMutation()
 
   const isDeckMode = !!deckId
-  // Use collection search if:
-  // - We're in collection mode (!!collectionId), OR
-  // - Deck is in collectionOnly mode, OR
-  // - Deck has a collection linked (even if not in collectionOnly mode)
-  const useCollectionSearch = !!collectionId || collectionOnly || (isDeckMode && deckCollectionId != null)
+  // Use collection search ONLY for decks in collection-only mode or with a linked collection
+  // When adding cards to a collection directly, always use Scryfall API to search all available cards
+  const useCollectionSearch = isDeckMode && (collectionOnly || deckCollectionId != null)
   // When in deck mode, use the deck's collectionId (can be null for all collections)
-  // When in collection mode, use the specific collectionId
-  const searchCollectionId = isDeckMode ? deckCollectionId : collectionId
+  const searchCollectionId = deckCollectionId
 
   const handleCardSelect = (card: ScryfallCard) => {
     setSelectedCard(card)
