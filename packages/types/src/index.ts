@@ -121,3 +121,110 @@ export interface ApiSuccess<T = any> {
 // This is a placeholder type that will be replaced with the actual
 // AppRouter type from the backend once tRPC routes are implemented
 export type AppRouter = any;
+
+// ============================================================================
+// Deck Strategy Types
+// ============================================================================
+
+/**
+ * Commander-specific deck strategies
+ * Based on common archetypes in EDH format
+ */
+export enum CommanderStrategy {
+  Tribal = 'tribal',                    // Creature type synergy (Elves, Dragons, etc.)
+  Aristocrats = 'aristocrats',          // Sacrifice and death triggers
+  Spellslinger = 'spellslinger',        // Instant/sorcery-focused
+  Voltron = 'voltron',                  // Commander damage focus
+  Stax = 'stax',                        // Resource denial/prison
+  Combo = 'combo',                      // Infinite combo wins
+  Tokens = 'tokens',                    // Token generation and go-wide
+  Reanimator = 'reanimator',            // Graveyard recursion
+  Lands = 'lands',                      // Land-based synergies
+  Vehicles = 'vehicles',                // Vehicle tribal
+  Artifacts = 'artifacts',              // Artifact synergies
+  Enchantments = 'enchantments',        // Enchantment synergies
+  Superfriends = 'superfriends',        // Planeswalker-focused
+  GroupHug = 'group_hug',               // Symmetrical benefits
+  Chaos = 'chaos',                      // Random/chaotic effects
+  Stompy = 'stompy',                    // Big creatures/combat
+  Politics = 'politics',                // Multiplayer interaction
+  Midrange = 'midrange',                // Value-based strategy
+}
+
+/**
+ * Constructed format deck strategies
+ * Applicable to Standard, Modern, Pioneer, Legacy, Vintage
+ */
+export enum ConstructedStrategy {
+  Aggro = 'aggro',                      // Fast, low-curve aggressive
+  Control = 'control',                  // Counter/removal, late-game
+  Midrange = 'midrange',                // Value creatures/spells
+  Combo = 'combo',                      // Specific card combos
+  Tribal = 'tribal',                    // Creature type synergy
+  Tempo = 'tempo',                      // Efficient threats + disruption
+  Ramp = 'ramp',                        // Mana acceleration
+  Burn = 'burn',                        // Direct damage
+  Mill = 'mill',                        // Library depletion
+  Prison = 'prison',                    // Lock opponent's resources
+}
+
+/**
+ * Magic: The Gathering color identity
+ * W = White, U = Blue, B = Black, R = Red, G = Green
+ */
+export type ManaColor = 'W' | 'U' | 'B' | 'R' | 'G';
+
+/**
+ * Color identity as array of mana colors
+ * Examples: ['W', 'U'], ['R', 'G'], []
+ */
+export type ColorIdentity = ManaColor[];
+
+/**
+ * Format types supported by the application
+ */
+export type DeckFormat =
+  | 'commander'
+  | 'standard'
+  | 'modern'
+  | 'pioneer'
+  | 'legacy'
+  | 'vintage'
+  | 'pauper'
+  | 'brawl';
+
+/**
+ * Union type of all possible strategy values
+ */
+export type DeckStrategy = CommanderStrategy | ConstructedStrategy;
+
+// ============================================================================
+// Color Identity Utilities
+// ============================================================================
+
+/**
+ * Parse color identity string to array
+ * @param colors - Color string like "WU", "BRG", or ""
+ * @returns Array of ManaColor values
+ */
+export function parseColorIdentity(colors: string): ColorIdentity {
+  const validColors: ManaColor[] = ['W', 'U', 'B', 'R', 'G'];
+  return Array.from(colors.toUpperCase())
+    .filter((c): c is ManaColor => validColors.includes(c as ManaColor));
+}
+
+/**
+ * Validate that a strategy is valid for a given format
+ * @param format - The deck format
+ * @param strategy - The strategy to validate
+ * @returns true if strategy is valid for format
+ */
+export function isValidStrategyForFormat(
+  format: DeckFormat,
+  strategy: DeckStrategy
+): boolean {
+  if (format === 'commander' || format === 'brawl') {
+    return Object.values(CommanderStrategy).includes(strategy as CommanderStrategy);
+  }
+  return Object.values(ConstructedStrategy).includes(strategy as ConstructedStrategy);
+}
