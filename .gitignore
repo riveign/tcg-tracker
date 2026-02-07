@@ -50,3 +50,10 @@ out/
 # Temporary files
 tmp/
 temp/
+CURRENT_WORK.md
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Orchestrator outputs
+outputs/
