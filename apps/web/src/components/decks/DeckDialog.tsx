@@ -71,6 +71,7 @@ export const DeckDialog = ({
 }: DeckDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentStep, setCurrentStep] = useState<Step>(1)
+  const [justChangedStep, setJustChangedStep] = useState(false)
   const utils = trpc.useUtils()
   const isEditing = Boolean(deckId)
 
@@ -135,6 +136,7 @@ export const DeckDialog = ({
   useEffect(() => {
     if (!open) {
       setCurrentStep(1)
+      setJustChangedStep(false)
     }
   }, [open])
 
@@ -153,6 +155,11 @@ export const DeckDialog = ({
   const onSubmit = async (values: DeckFormValues) => {
     // Prevent submission if not on final step (unless editing)
     if (!isEditing && currentStep < TOTAL_STEPS) {
+      return
+    }
+
+    // Prevent submission if we just changed steps (debounce)
+    if (!isEditing && justChangedStep) {
       return
     }
 
@@ -207,12 +214,21 @@ export const DeckDialog = ({
   const handleNext = () => {
     if (currentStep < TOTAL_STEPS) {
       setCurrentStep((prev) => (prev + 1) as Step)
+      setJustChangedStep(true)
+      // Clear the flag after a short delay to prevent accidental submissions
+      setTimeout(() => {
+        setJustChangedStep(false)
+      }, 300)
     }
   }
 
   const handleBack = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => (prev - 1) as Step)
+      setJustChangedStep(true)
+      setTimeout(() => {
+        setJustChangedStep(false)
+      }, 300)
     }
   }
 
