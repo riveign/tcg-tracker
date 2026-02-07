@@ -17,6 +17,7 @@ export function DeckDetail() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'mainboard' | 'sideboard' | 'recommendations'>('mainboard');
+  const [commanderSearchMode, setCommanderSearchMode] = useState(false);
 
   // Safe to use id! because queries are only enabled when id exists
   // and we have early return guard below at line 48-56
@@ -159,7 +160,23 @@ export function DeckDetail() {
       {/* Commander Section (if Commander format) */}
       {deck.format === 'Commander' && (
         <div className="space-y-2">
-          <h2 className="text-lg font-semibold text-text-primary">Commander</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-text-primary">Commander</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActiveTab('mainboard'); // Set tab for dialog context
+                setIsSearchOpen(true);
+                // Override cardType to commander via state
+                setCommanderSearchMode(true);
+              }}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {commanderCards.length === 0 ? 'Set Commander' : 'Change Commander'}
+            </Button>
+          </div>
           {commanderCards.length === 0 ? (
             <Card>
               <CardContent className="p-4 text-center text-text-secondary">
@@ -300,9 +317,18 @@ export function DeckDetail() {
       {/* Add Card Dialog */}
       <CardSearchDialog
         open={isSearchOpen}
-        onOpenChange={setIsSearchOpen}
+        onOpenChange={(open) => {
+          setIsSearchOpen(open);
+          if (!open) setCommanderSearchMode(false); // Reset commander mode when closing
+        }}
         deckId={id}
-        cardType={activeTab}
+        cardType={
+          commanderSearchMode
+            ? 'commander'
+            : activeTab === 'recommendations'
+            ? 'mainboard'
+            : activeTab
+        }
         collectionOnly={deck.collectionOnly}
         deckCollectionId={deck.collectionId}
       />
