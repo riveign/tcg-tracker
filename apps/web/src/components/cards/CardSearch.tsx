@@ -18,6 +18,7 @@ interface ScryfallCard {
   }
   mana_cost?: string
   type_line: string
+  color_identity?: string[]
 }
 
 interface CardSearchProps {

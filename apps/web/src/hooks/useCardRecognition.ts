@@ -85,7 +85,7 @@ function extractCardNames(ocrText: string): string[] {
   const cleanedLines = lines.map((line) => {
     // Remove special characters commonly misread by OCR
     return line
-      .replace(/[^\w\s',\-]/g, ' ')
+      .replace(/[^\w\s',-]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
   })

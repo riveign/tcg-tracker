@@ -132,6 +132,9 @@ export interface DeckWithCards {
   collectionId: string | null;
   cards: DeckCard[];
   commander?: DeckCard;
+  commanderId?: string | null;
+  colors?: ManaColor[];
+  strategy?: string | null;
 }
 
 // =============================================================================
@@ -298,6 +301,8 @@ export interface ScoringContext {
   gaps: DeckGapAnalysis;
   stage: DeckStage;
   adapter: FormatAdapter;
+  deckStrategy?: string | null;
+  deckColors?: ManaColor[];
 }
 
 // =============================================================================

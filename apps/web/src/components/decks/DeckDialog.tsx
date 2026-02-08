@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -30,7 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc'
+import { CommanderDeckForm } from './CommanderDeckForm'
+import { ConstructedDeckForm } from './ConstructedDeckForm'
 
 const deckFormSchema = z.object({
   name: z.string().min(1, 'Deck name is required').max(255),
@@ -38,7 +41,19 @@ const deckFormSchema = z.object({
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
   collectionOnly: z.boolean().default(false),
   collectionId: z.string().uuid().optional().nullable(),
+  // New fields for commander/metadata
+  colors: z.array(z.enum(['W', 'U', 'B', 'R', 'G'])).default([]),
+  strategy: z.string().max(50).optional().nullable(),
+  // Internal fields for commander selection (not sent to API directly)
+  _selectedCommander: z.any().optional().nullable(),
+  _commanderScryfallId: z.string().optional().nullable(),
 })
+
+const FORMATS = ['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other'] as const
+
+type Step = 1 | 2
+
+const TOTAL_STEPS = 2
 
 type DeckFormValues = z.infer<typeof deckFormSchema>
 
@@ -54,6 +69,7 @@ export const DeckDialog = ({
   deckId,
 }: DeckDialogProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [currentStep, setCurrentStep] = useState<Step>(1)
   const utils = trpc.useUtils()
   const isEditing = Boolean(deckId)
 
@@ -64,6 +80,8 @@ export const DeckDialog = ({
   )
 
   const { data: collections = [] } = trpc.collections.list.useQuery()
+
+  const addCardMutation = trpc.decks.addCard.useMutation()
 
   const createMutation = trpc.decks.create.useMutation()
   const updateMutation = trpc.decks.update.useMutation()
@@ -76,6 +94,8 @@ export const DeckDialog = ({
       format: undefined,
       collectionOnly: false,
       collectionId: null,
+      colors: [],
+      strategy: null,
     },
   })
 
@@ -85,11 +105,14 @@ export const DeckDialog = ({
       form.reset({
         name: deck.name,
         description: deck.description || '',
-        // Type assertion needed because deck.format comes from DB as string
-        // but form expects the specific enum type
         format: deck.format as any || undefined,
         collectionOnly: deck.collectionOnly || false,
         collectionId: deck.collectionId || null,
+        colors: (deck.colors as string[]) || [],
+        strategy: deck.strategy || null,
+        // For editing, we don't have the full commander object
+        _selectedCommander: null,
+        _commanderScryfallId: null,
       })
     } else if (!isEditing) {
       form.reset({
@@ -98,27 +121,80 @@ export const DeckDialog = ({
         format: undefined,
         collectionOnly: false,
         collectionId: null,
+        colors: [],
+        strategy: null,
+        _selectedCommander: null,
+        _commanderScryfallId: null,
       })
+      setCurrentStep(1)
     }
   }, [deck, isEditing, form])
 
+  // Reset step when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setCurrentStep(1)
+    }
+  }, [open])
+
+  const selectedFormat = form.watch('format')
+  const isCommanderFormat = selectedFormat === 'Commander'
+  const nameValue = form.watch('name')
+  const formatValue = form.watch('format')
+
+  // Step validation
+  const canAdvanceFromStep1 = useMemo(() => {
+    return nameValue?.trim().length > 0 && formatValue !== undefined
+  }, [nameValue, formatValue])
+
+  const canAdvanceFromStep2 = true // Step 2 fields are optional
+
   const onSubmit = async (values: DeckFormValues) => {
+    // Prevent submission if not on final step (unless editing)
+    if (!isEditing && currentStep < TOTAL_STEPS) {
+      return
+    }
+
     try {
       setIsSubmitting(true)
+
+      // Remove internal fields before sending to API
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _selectedCommander, _commanderScryfallId, ...apiValues } = values
 
       if (isEditing && deckId) {
         await updateMutation.mutateAsync({
           deckId,
-          ...values,
+          ...apiValues,
+          // For editing, we might need to handle commander differently
+          // This depends on whether we have internal card ID
         })
       } else {
-        await createMutation.mutateAsync(values)
+        // Create deck first
+        const newDeck = await createMutation.mutateAsync(apiValues)
+
+        // If commander was selected, add it as a commander card
+        if (_commanderScryfallId && newDeck) {
+          try {
+            await addCardMutation.mutateAsync({
+              deckId: newDeck.id,
+              cardId: _commanderScryfallId,
+              quantity: 1,
+              cardType: 'commander',
+            })
+          } catch (commanderError) {
+            console.error('Failed to add commander to deck:', commanderError)
+            // Notify user that commander addition failed
+            alert('Deck created successfully, but commander could not be added automatically. Please add your commander manually from the deck view.')
+          }
+        }
       }
 
       // Refresh decks list
       await utils.decks.list.invalidate()
 
       // Close dialog and reset form
+      setCurrentStep(1)
       onOpenChange(false)
       form.reset()
     } catch (error) {
@@ -128,165 +204,308 @@ export const DeckDialog = ({
     }
   }
 
+  const handleNext = (e?: React.MouseEvent) => {
+    // Ensure this doesn't trigger form submission
+    e?.preventDefault()
+    e?.stopPropagation()
+
+    if (currentStep < TOTAL_STEPS) {
+      setCurrentStep((prev) => (prev + 1) as Step)
+    }
+  }
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => (prev - 1) as Step)
+    }
+  }
+
+  const handleClose = () => {
+    setCurrentStep(1)
+    form.reset()
+    onOpenChange(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    // Prevent ALL Enter key form submissions during multi-step flow
+    // Users must explicitly click Next/Submit buttons
+    if (e.key === 'Enter' && !isEditing) {
+      const target = e.target as HTMLElement
+
+      // Allow Enter on buttons (they handle their own click events)
+      if (target.tagName === 'BUTTON') {
+        return
+      }
+
+      // Prevent Enter from submitting the form in all other cases
+      e.preventDefault()
+    }
+  }
+
+  // Step indicator component
+  const StepIndicator = () => (
+    <div className="flex items-center justify-center gap-2 mb-4">
+      {[1, 2].map((step) => (
+        <div key={step} className="flex items-center">
+          <div
+            className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors',
+              currentStep === step
+                ? 'bg-accent-cyan text-background'
+                : currentStep > step
+                ? 'bg-accent-cyan/30 text-accent-cyan'
+                : 'bg-surface-elevated text-text-secondary'
+            )}
+          >
+            {step}
+          </div>
+          {step < TOTAL_STEPS && (
+            <div
+              className={cn(
+                'w-8 h-0.5 mx-1',
+                currentStep > step ? 'bg-accent-cyan/30' : 'bg-surface-elevated'
+              )}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+
+  const getStepTitle = () => {
+    switch (currentStep) {
+      case 1:
+        return 'Deck Details & Collection'
+      case 2:
+        return isCommanderFormat ? 'Commander & Strategy' : 'Colors & Strategy'
+      default:
+        return ''
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? 'Edit Deck' : 'Create New Deck'}
           </DialogTitle>
           <DialogDescription>
-            {isEditing
-              ? 'Update your deck details'
-              : 'Create a new deck to build and test'}
+            {isEditing ? 'Update your deck details' : getStepTitle()}
           </DialogDescription>
         </DialogHeader>
 
+        {!isEditing && <StepIndicator />}
+
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="My Deck"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form
+            onSubmit={(e) => {
+              // Only allow submission on final step
+              if (!isEditing && currentStep < TOTAL_STEPS) {
+                e.preventDefault()
+                e.stopPropagation()
+                return false
+              }
+              form.handleSubmit(onSubmit)(e)
+            }}
+            onKeyDown={handleKeyDown}
+            className="space-y-4"
+          >
+            {/* Step 1: Basic Info + Collection Settings */}
+            {(currentStep === 1 || isEditing) && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="My Deck"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe your deck strategy..."
-                      className="resize-none"
-                      {...field}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe your deck strategy..."
+                          className="resize-none"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="format"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Format (optional)</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select format" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Standard">Standard</SelectItem>
-                      <SelectItem value="Modern">Modern</SelectItem>
-                      <SelectItem value="Commander">Commander</SelectItem>
-                      <SelectItem value="Legacy">Legacy</SelectItem>
-                      <SelectItem value="Vintage">Vintage</SelectItem>
-                      <SelectItem value="Pioneer">Pioneer</SelectItem>
-                      <SelectItem value="Pauper">Pauper</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="text-xs">
-                    The Magic format this deck is built for
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="format"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Format {!isEditing && <span className="text-red-400">*</span>}</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select format" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {FORMATS.map((format) => (
+                            <SelectItem key={format} value={format}>
+                              {format}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-xs">
+                        {!isEditing
+                          ? 'Select format to continue'
+                          : 'The Magic format this deck is built for'}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="collectionId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Collection (optional)</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
-                    value={field.value || 'none'}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a collection" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">All Collections (Aggregate)</SelectItem>
-                      {collections.map((collection) => (
-                        <SelectItem key={collection.id} value={collection.id}>
-                          {collection.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="text-xs">
-                    Link deck to a specific collection or use all collections
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="collectionId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Collection (optional)</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                        value={field.value || 'none'}
+                        disabled={isSubmitting}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a collection" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">All Collections (Aggregate)</SelectItem>
+                          {collections.map((collection) => (
+                            <SelectItem key={collection.id} value={collection.id}>
+                              {collection.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-xs">
+                        Link deck to a specific collection or use all collections
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="collectionOnly"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel>Collection Cards Only</FormLabel>
-                    <FormDescription className="text-xs">
-                      Only allow cards from your collections in this deck
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="collectionOnly"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <FormLabel>Collection Cards Only</FormLabel>
+                        <FormDescription className="text-xs">
+                          Only allow cards from your collections in this deck
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
+            {/* Step 2: Format-Specific Form */}
+            {currentStep === 2 && !isEditing && (
+              isCommanderFormat ? (
+                <CommanderDeckForm form={form} disabled={isSubmitting} />
+              ) : (
+                <ConstructedDeckForm form={form} disabled={isSubmitting} />
+              )
+            )}
+
+            {/* For editing mode, show all form sections plus strategy/colors */}
+            {isEditing && (
+              isCommanderFormat ? (
+                <CommanderDeckForm form={form} disabled={isSubmitting} />
+              ) : (
+                <ConstructedDeckForm form={form} disabled={isSubmitting} />
+              )
+            )}
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? 'Saving...'
-                  : isEditing
-                  ? 'Save Changes'
-                  : 'Create Deck'}
-              </Button>
+              {/* Left side: Cancel or Back */}
+              <div className="flex-1 flex justify-start">
+                {!isEditing && currentStep > 1 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleBack}
+                    disabled={isSubmitting}
+                  >
+                    Back
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+
+              {/* Right side: Next or Submit */}
+              {!isEditing && currentStep < TOTAL_STEPS ? (
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={
+                    isSubmitting ||
+                    (currentStep === 1 && !canAdvanceFromStep1) ||
+                    (currentStep === 2 && !canAdvanceFromStep2)
+                  }
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? 'Saving...'
+                    : isEditing
+                    ? 'Save Changes'
+                    : 'Create Deck'}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         </Form>

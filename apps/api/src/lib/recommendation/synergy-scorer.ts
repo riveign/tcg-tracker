@@ -259,8 +259,11 @@ export class SynergyScorer {
   ): number {
     let score = 0;
 
+    // Use explicit deck strategy if present, otherwise use detected archetype
+    const effectiveArchetype = context.deckStrategy ?? context.archetype;
+
     // Get archetype modifiers
-    const modifiers = context.adapter.getArchetypeModifiers(context.archetype);
+    const modifiers = context.adapter.getArchetypeModifiers(effectiveArchetype);
 
     // Check preferred keywords
     const cardKeywords = card.keywords ?? [];
@@ -315,6 +318,37 @@ export class SynergyScorer {
         points: stageBonus,
         weight: 1,
       });
+    }
+
+    // Strategy-specific keyword boosts (when explicit strategy is set)
+    if (context.deckStrategy) {
+      const oracleText = card.oracleText?.toLowerCase() ?? '';
+      const strategyKeywordBoosts: Record<string, { patterns: RegExp[]; points: number }> = {
+        tribal: { patterns: [/creature type|all .+ get|other .+ you control/i], points: 4 },
+        aristocrats: { patterns: [/when.*dies|sacrifice|blood artist/i], points: 4 },
+        spellslinger: { patterns: [/whenever you cast.*instant|sorcery|magecraft/i], points: 4 },
+        voltron: { patterns: [/equipped creature|attach|aura.*attach/i], points: 4 },
+        reanimator: { patterns: [/from.*graveyard|return.*creature.*graveyard/i], points: 4 },
+        tokens: { patterns: [/create.*token|populate|token.*creature/i], points: 4 },
+        aggro: { patterns: [/haste|first strike|can't block/i], points: 3 },
+        control: { patterns: [/counter target|return.*to.*hand|tap.*doesn't untap/i], points: 3 },
+        ramp: { patterns: [/add.*mana|search.*library.*land/i], points: 3 },
+        combo: { patterns: [/untap|infinite|copy.*spell/i], points: 4 },
+      };
+
+      const boost = strategyKeywordBoosts[context.deckStrategy.toLowerCase()];
+      if (boost) {
+        const matchesPattern = boost.patterns.some((p) => p.test(oracleText));
+        if (matchesPattern) {
+          score += boost.points;
+          breakdown.push({
+            category: 'strategic',
+            reason: `Matches ${context.deckStrategy} strategy`,
+            points: boost.points,
+            weight: 1,
+          });
+        }
+      }
     }
 
     return Math.max(0, Math.min(30, score));

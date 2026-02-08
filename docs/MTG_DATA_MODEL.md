@@ -292,6 +292,162 @@ Add game discriminator field
 ### v3: Extract Common Fields
 Move MTG-specific fields into nested `game_data` object
 
+## Deck Metadata Model
+
+### Overview
+
+Decks in the system now support format-specific metadata including commander cards, color identity, and strategy archetypes. This enables advanced filtering, recommendations, and deck analysis.
+
+### Deck Schema
+
+```typescript
+interface Deck {
+  id: string;
+  name: string;
+  description?: string;
+  format: string;              // "commander", "standard", "modern", etc.
+  collectionOnly: boolean;
+  collectionId?: string;
+  ownerId: string;
+
+  // Deck metadata for recommendations
+  commanderId?: string;        // UUID reference to cards table (for Commander/Brawl)
+  colors: string[];            // Color identity ['W', 'U', 'B', 'R', 'G']
+  strategy?: string;           // Strategy enum value
+
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date;
+}
+```
+
+### Color Identity
+
+**Definition:** The color identity of a deck is determined by all mana symbols appearing in its cards (mana costs, activated abilities, and characteristic-defining abilities).
+
+**Storage:** Text array using WUBRG notation:
+- `W` = White
+- `U` = Blue
+- `B` = Black
+- `R` = Red
+- `G` = Green
+
+**Examples:**
+- Mono-white: `['W']`
+- Azorius (WU): `['W', 'U']`
+- Grixis (UBR): `['U', 'B', 'R']`
+- Five-color: `['W', 'U', 'B', 'R', 'G']`
+- Colorless: `[]`
+
+**Commander Format Rules:**
+- Commander's color identity determines deck-building restrictions
+- No cards with mana symbols outside commander's color identity
+- Hybrid mana counts as both colors
+- Phyrexian mana counts toward color identity
+
+**Database Implementation:**
+- Stored as `TEXT[]` in PostgreSQL
+- GIN index for efficient color combination queries
+- Default value: empty array `{}`
+
+### Strategy Archetypes
+
+**Purpose:** Categorize decks by their primary strategic approach for improved recommendations and filtering.
+
+#### Commander Strategies
+
+Strategies specific to multiplayer Commander/EDH format:
+
+1. **Tribal** - Creature type synergy (Elves, Dragons, Zombies, etc.)
+2. **Aristocrats** - Sacrifice and death triggers
+3. **Spellslinger** - Instant/sorcery-focused gameplay
+4. **Voltron** - Commander damage through heavy equipment/auras
+5. **Stax** - Resource denial and prison effects
+6. **Combo** - Infinite combo wins
+7. **Tokens** - Token generation and go-wide strategies
+8. **Reanimator** - Graveyard recursion
+9. **Lands** - Land-based synergies and interactions
+10. **Vehicles** - Vehicle tribal
+11. **Artifacts** - Artifact synergies
+12. **Enchantments** - Enchantment synergies
+13. **Superfriends** - Planeswalker-focused
+14. **Group Hug** - Symmetrical benefits for political play
+15. **Chaos** - Random/chaotic effects
+16. **Stompy** - Big creatures and combat
+17. **Politics** - Multiplayer interaction and deal-making
+18. **Midrange** - Value-based strategy
+
+#### Constructed Strategies
+
+Strategies for 1v1 formats (Standard, Modern, Pioneer, Legacy, Vintage):
+
+1. **Aggro** - Fast, low-curve aggressive strategy
+2. **Control** - Counter/removal with late-game focus
+3. **Midrange** - Value creatures and spells
+4. **Combo** - Specific card combinations for wins
+5. **Tribal** - Creature type synergy
+6. **Tempo** - Efficient threats with disruption
+7. **Ramp** - Mana acceleration for big plays
+8. **Burn** - Direct damage to player
+9. **Mill** - Library depletion win condition
+10. **Prison** - Lock opponent's resources
+
+**Storage:** VARCHAR(50) nullable field using enum string values (e.g., `'tribal'`, `'aggro'`)
+
+**Validation:** Use `isValidStrategyForFormat()` to ensure strategy matches deck format:
+- Commander/Brawl formats use `CommanderStrategy`
+- Other formats use `ConstructedStrategy`
+
+### Database Indexes
+
+**Performance Optimization:**
+
+```sql
+-- Commander card lookups
+CREATE INDEX idx_decks_commander_id ON decks(commander_id)
+  WHERE deleted_at IS NULL;
+
+-- Strategy filtering
+CREATE INDEX idx_decks_strategy ON decks(strategy)
+  WHERE deleted_at IS NULL;
+
+-- Color combination queries
+CREATE INDEX idx_decks_colors ON decks USING GIN(colors)
+  WHERE deleted_at IS NULL;
+```
+
+All indexes exclude soft-deleted decks for optimal query performance.
+
+### Utilities
+
+**parseColorIdentity(colors: string): ColorIdentity**
+- Parses color string (e.g., "WU", "WUBRG") to array
+- Case-insensitive input
+- Validates against WUBRG color set
+- Returns typed ColorIdentity array
+
+**isValidStrategyForFormat(format: DeckFormat, strategy: DeckStrategy): boolean**
+- Validates strategy is appropriate for format
+- Prevents Commander strategies in Standard decks
+- Prevents Constructed strategies in Commander decks
+- Returns boolean validity
+
+### Migration
+
+**Version:** 0006_add_deck_metadata.sql
+
+**Changes:**
+- Adds `commander_id` UUID field with foreign key to cards table
+- Adds `colors` TEXT[] field with default empty array
+- Adds `strategy` VARCHAR(50) nullable field
+- Creates performance indexes for all new fields
+- Uses idempotent DO blocks for safe re-runs
+
+**Backward Compatibility:**
+- All new fields are nullable or have defaults
+- Existing decks continue to function normally
+- No data migration required for existing rows
+
 ## Sources
 
 - [Scryfall API Documentation](https://scryfall.com/docs/api)
@@ -299,3 +455,5 @@ Move MTG-specific fields into nested `game_data` object
 - [MTGJSON](https://mtgjson.com/)
 - [MTG Card Types - Draftsim](https://draftsim.com/mtg-card-types/)
 - [MTG Keyword Abilities - MTG Wiki](https://mtg.fandom.com/wiki/Keyword_ability)
+- [Commander Color Identity Rules - MTG Wiki](https://mtg.fandom.com/wiki/Color_identity)
+- [Commander Deck Archetypes - EDHREC](https://edhrec.com/)

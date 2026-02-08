@@ -106,6 +106,42 @@ const ARCHETYPE_MODIFIERS: Record<string, ArchetypeModifiers> = {
     preferredKeywords: [],
     avoidKeywords: [],
   },
+  tempo: {
+    categoryWeights: {
+      creatures: 1.3,
+      removal: 1.2,
+      protection: 1.1,
+    },
+    preferredKeywords: ['flash', 'flying', 'prowess'],
+    avoidKeywords: [],
+  },
+  ramp: {
+    categoryWeights: {
+      ramp: 1.5,
+      threats: 1.4,
+      creatures: 1.1,
+    },
+    preferredKeywords: ['mana', 'land'],
+    avoidKeywords: [],
+  },
+  burn: {
+    categoryWeights: {
+      removal: 1.5,
+      cardDraw: 1.2,
+      creatures: 0.6,
+    },
+    preferredKeywords: ['damage', 'instant', 'sorcery'],
+    avoidKeywords: [],
+  },
+  mill: {
+    categoryWeights: {
+      cardDraw: 1.4,
+      removal: 1.2,
+      creatures: 0.5,
+    },
+    preferredKeywords: ['mill', 'library'],
+    avoidKeywords: [],
+  },
   default: {
     categoryWeights: {},
     preferredKeywords: [],
@@ -325,13 +361,41 @@ export class StandardAdapter implements FormatAdapter {
   // Format-Specific Logic
   // ===========================================================================
 
-  getColorConstraint(_deck: DeckWithCards): ColorConstraint {
+  getColorConstraint(deck: DeckWithCards): ColorConstraint {
     // Standard doesn't enforce color identity like Commander
-    // All colors are allowed, constraint is not enforced
+    // But we can use deck.colors as a preference filter if present
+    // Ensure colors is an array (database might return string on legacy decks)
+    const colors = Array.isArray(deck.colors) ? deck.colors : [];
+
+    if (colors.length > 0) {
+      return {
+        allowedColors: colors,
+        enforced: false, // Preference, not enforced
+      };
+    }
+
+    // No color preference specified - allow all
     return {
       allowedColors: ['W', 'U', 'B', 'R', 'G'],
       enforced: false,
     };
+  }
+
+  /**
+   * Check if a card matches the deck's color preference
+   * For constructed formats, this is a soft preference (scoring boost), not enforcement
+   * @param card The card to check
+   * @param deck The deck to check against
+   * @returns true if card matches color preference or no preference is set
+   */
+  matchesColorPreference(card: Card, deck: DeckWithCards): boolean {
+    // Ensure colors is an array (database might return string on legacy decks)
+    const colors = Array.isArray(deck.colors) ? deck.colors : [];
+    if (colors.length === 0) return true;
+
+    const cardColors = card.colorIdentity as ManaColor[] | null;
+    if (!cardColors || cardColors.length === 0) return true; // Colorless always matches
+    return cardColors.every((color) => colors.includes(color));
   }
 
   isColorCompatible(card: Card, constraint: ColorConstraint): boolean {

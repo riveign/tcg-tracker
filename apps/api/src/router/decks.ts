@@ -7,12 +7,18 @@ import { handlePromise } from '../lib/utils.js';
 import { getCardById, transformScryfallCard } from '../lib/scryfall.js';
 
 // Input schemas
+const colorEnum = z.enum(['W', 'U', 'B', 'R', 'G']);
+
 const createDeckSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
   collectionOnly: z.boolean().default(false),
-  collectionId: z.string().uuid().optional().nullable()
+  collectionId: z.string().uuid().optional().nullable(),
+  // New commander/metadata fields
+  commanderId: z.string().uuid().optional().nullable(),
+  colors: z.array(colorEnum).optional(),
+  strategy: z.string().max(50).optional().nullable(),
 });
 
 const updateDeckSchema = z.object({
@@ -21,7 +27,11 @@ const updateDeckSchema = z.object({
   description: z.string().optional(),
   format: z.enum(['Standard', 'Modern', 'Commander', 'Legacy', 'Vintage', 'Pioneer', 'Pauper', 'Other']).optional(),
   collectionOnly: z.boolean().optional(),
-  collectionId: z.string().uuid().optional().nullable()
+  collectionId: z.string().uuid().optional().nullable(),
+  // New commander/metadata fields
+  commanderId: z.string().uuid().optional().nullable(),
+  colors: z.array(colorEnum).optional(),
+  strategy: z.string().max(50).optional().nullable(),
 });
 
 const addCardToDeckSchema = z.object({
@@ -43,6 +53,32 @@ const removeCardSchema = z.object({
   cardId: z.string().uuid(),
   cardType: z.enum(['mainboard', 'sideboard', 'commander']).default('mainboard')
 });
+
+/**
+ * Validates if a card can be used as a commander.
+ * Checks for legendary creature type or "can be your commander" in oracle text.
+ */
+interface CardForCommanderCheck {
+  typeLine: string;
+  supertypes: string[];
+  types: string[];
+  oracleText?: string | null;
+}
+
+function canBeCommander(card: CardForCommanderCheck): boolean {
+  const oracleText = card.oracleText?.toLowerCase() ?? '';
+
+  // Check for explicit "can be your commander" text
+  if (oracleText.includes('can be your commander')) {
+    return true;
+  }
+
+  // Legendary creatures can always be commanders
+  const isLegendary = card.supertypes?.includes('Legendary') ?? false;
+  const isCreature = card.types?.includes('Creature') ?? false;
+
+  return isLegendary && isCreature;
+}
 
 export const decksRouter = router({
   // List all decks for authenticated user
@@ -157,6 +193,44 @@ export const decksRouter = router({
         }
       }
 
+      // Validate commander if provided
+      let commanderColors: string[] | undefined;
+      if (input.commanderId) {
+        const { data: commanderCard, error: commanderError } = await handlePromise(
+          db.query.cards.findFirst({
+            where: eq(cards.id, input.commanderId)
+          })
+        );
+
+        if (commanderError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to validate commander',
+          });
+        }
+
+        if (!commanderCard) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Commander card not found. Please add the card to the system first.',
+          });
+        }
+
+        // Validate the card can be a commander
+        if (!canBeCommander(commanderCard)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selected card cannot be used as a commander. Only legendary creatures are valid commanders.',
+          });
+        }
+
+        // Extract color identity from commander if colors not provided
+        commanderColors = commanderCard.colorIdentity;
+      }
+
+      // Use provided colors, or commander's color identity, or empty array
+      const finalColors = input.colors ?? commanderColors ?? [];
+
       const { data: insertResult, error: insertError } = await handlePromise(
         db.insert(decks).values({
           name: input.name,
@@ -164,6 +238,9 @@ export const decksRouter = router({
           format: input.format,
           collectionOnly: input.collectionOnly,
           collectionId: input.collectionId,
+          commanderId: input.commanderId,
+          colors: finalColors,
+          strategy: input.strategy,
           ownerId: ctx.user.userId
         }).returning()
       );
@@ -185,11 +262,52 @@ export const decksRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { deckId, ...updates } = input;
 
+      // Validate commander if being updated
+      let commanderColors: string[] | undefined;
+      if (updates.commanderId) {
+        const { data: commanderCard, error: commanderError } = await handlePromise(
+          db.query.cards.findFirst({
+            where: eq(cards.id, updates.commanderId)
+          })
+        );
+
+        if (commanderError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to validate commander',
+          });
+        }
+
+        if (!commanderCard) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Commander card not found. Please add the card to the system first.',
+          });
+        }
+
+        // Validate the card can be a commander
+        if (!canBeCommander(commanderCard)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Selected card cannot be used as a commander. Only legendary creatures are valid commanders.',
+          });
+        }
+
+        // Extract color identity from commander for auto-population
+        commanderColors = commanderCard.colorIdentity;
+      }
+
+      // Prepare updates, including colors from commander if not explicitly provided
+      const finalUpdates = {
+        ...updates,
+        colors: updates.colors ?? commanderColors,
+      };
+
       const { data: updateResult, error: updateError } = await handlePromise(
         db
           .update(decks)
           .set({
-            ...updates,
+            ...finalUpdates,
             updatedAt: new Date()
           })
           .where(and(
