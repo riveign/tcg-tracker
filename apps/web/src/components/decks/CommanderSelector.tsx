@@ -75,13 +75,9 @@ const canBeCommander = (card: ScryfallCard): boolean => {
     return true
   }
 
-  // Some planeswalkers can be commanders (check type line for "can be your commander")
-  // This text would be in oracle text, but we don't have it in ScryfallCard interface
-  // For now, allow legendary planeswalkers as potential commanders
-  const isPlaneswalker = typeLine.includes('planeswalker')
-  if (isLegendary && isPlaneswalker) {
-    return true
-  }
+  // Note: Some planeswalkers can be commanders if they have "can be your commander"
+  // in their oracle text. The backend will validate this on submission.
+  // We allow the selection here and let backend validation provide the final check.
 
   return false
 }

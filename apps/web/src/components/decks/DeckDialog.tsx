@@ -184,7 +184,8 @@ export const DeckDialog = ({
             })
           } catch (commanderError) {
             console.error('Failed to add commander to deck:', commanderError)
-            // Deck was created, commander add failed - acceptable degradation
+            // Notify user that commander addition failed
+            alert('Deck created successfully, but commander could not be added automatically. Please add your commander manually from the deck view.')
           }
         }
       }

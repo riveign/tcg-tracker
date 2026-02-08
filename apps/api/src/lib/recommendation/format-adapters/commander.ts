@@ -480,9 +480,12 @@ export class CommanderAdapter implements FormatAdapter {
 
   getColorConstraint(deck: DeckWithCards): ColorConstraint {
     // Priority 1: Use deck.colors metadata when present (from deck creation wizard)
-    if (deck.colors && deck.colors.length > 0) {
+    // Ensure colors is an array (database might return string on legacy decks)
+    const colors = Array.isArray(deck.colors) ? deck.colors : [];
+
+    if (colors.length > 0) {
       return {
-        allowedColors: deck.colors,
+        allowedColors: colors,
         enforced: true,
       };
     }

@@ -364,9 +364,12 @@ export class StandardAdapter implements FormatAdapter {
   getColorConstraint(deck: DeckWithCards): ColorConstraint {
     // Standard doesn't enforce color identity like Commander
     // But we can use deck.colors as a preference filter if present
-    if (deck.colors && deck.colors.length > 0) {
+    // Ensure colors is an array (database might return string on legacy decks)
+    const colors = Array.isArray(deck.colors) ? deck.colors : [];
+
+    if (colors.length > 0) {
       return {
-        allowedColors: deck.colors,
+        allowedColors: colors,
         enforced: false, // Preference, not enforced
       };
     }
@@ -386,10 +389,13 @@ export class StandardAdapter implements FormatAdapter {
    * @returns true if card matches color preference or no preference is set
    */
   matchesColorPreference(card: Card, deck: DeckWithCards): boolean {
-    if (!deck.colors || deck.colors.length === 0) return true;
+    // Ensure colors is an array (database might return string on legacy decks)
+    const colors = Array.isArray(deck.colors) ? deck.colors : [];
+    if (colors.length === 0) return true;
+
     const cardColors = card.colorIdentity as ManaColor[] | null;
     if (!cardColors || cardColors.length === 0) return true; // Colorless always matches
-    return cardColors.every((color) => deck.colors!.includes(color));
+    return cardColors.every((color) => colors.includes(color));
   }
 
   isColorCompatible(card: Card, constraint: ColorConstraint): boolean {
